@@ -1,0 +1,19 @@
+# Environment & Keys
+.env
+*.env
+
+# Python Virtual Environment
+venv/
+ENV/
+env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# SQLite Database
+auditor.db
+
+# Streamlit Cache
+.streamlit/secrets.toml
