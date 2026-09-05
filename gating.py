@@ -11,7 +11,7 @@ class GatingEngine:
 
     def process_human_decision(self, tx_id, decision, reviewer="Human Admin"):
         """
-        Handles Approve or Reject actions for transactions paused by the Fair Incentive Gate.
+        Handles Approve or Reject actions for transactions flagged for human review.
         """
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -24,37 +24,38 @@ class GatingEngine:
             return False, "Transaction not found."
 
         amount = float(row[2]) if row[2] else 0.0
+        failure_reason = row[9]
         
         if decision == "APPROVE":
-            new_status = "Recovered"
-            action_taken = "Approved by Human Admin: Overridden Incentive Threshold & Retry Sent"
+            if failure_reason == "DUPLICATE_CHARGE_SUSPECTED":
+                new_status = "Recovered"
+                action_taken = "Approved by Human Admin: Duplicate Confirmed. Refund Initiated."
+                details = f"Reviewer ({reviewer}) approved duplicate refund for ₹{amount}."
+            else:
+                new_status = "Recovered"
+                action_taken = "Approved by Human Admin: Action Authorized."
+                details = f"Reviewer ({reviewer}) approved flagged transaction."
             
-            gw_fee = round(amount * 0.02, 2)
-            bank_fee = round(amount * 0.005, 2)
-            gst = round((gw_fee + bank_fee) * 0.18, 2)
-            net_settled = round(amount - (gw_fee + bank_fee + gst), 2)
-            fee_json = json.dumps({
-                "gross_amount": amount,
-                "gateway_fee": gw_fee,
-                "bank_fee": bank_fee,
-                "gst": gst,
-                "net_settled": net_settled
-            })
-
             cursor.execute('''
                 UPDATE transactions 
-                SET status = ?, action_taken = ?, flagged = 0, fee_breakdown = ?, updated_at = ?
+                SET status = ?, action_taken = ?, flagged = 0, updated_at = ?
                 WHERE id = ?
-            ''', (new_status, action_taken, fee_json, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), tx_id))
+            ''', (new_status, action_taken, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), tx_id))
 
             cursor.execute('''
                 INSERT INTO audit_log (transaction_id, action, details, is_live_api_call)
                 VALUES (?, ?, ?, 1)
-            ''', (tx_id, "HUMAN_APPROVED", f"Reviewer ({reviewer}) approved flagged transaction. Incentive applied.", 1))
+            ''', (tx_id, "HUMAN_APPROVED", details, 1))
 
         elif decision == "REJECT":
-            new_status = "Mismatched"
-            action_taken = "Rejected by Human Admin: Incentive Cancelled. Standard Recovery Initiated."
+            if failure_reason == "DUPLICATE_CHARGE_SUSPECTED":
+                new_status = "Settled"
+                action_taken = "Rejected by Human Admin: Duplicate Denied. Valid Charge."
+                details = f"Reviewer ({reviewer}) rejected duplicate flag. Charge stands."
+            else:
+                new_status = "Mismatched"
+                action_taken = "Rejected by Human Admin: Action Denied."
+                details = f"Reviewer ({reviewer}) rejected flagged transaction."
 
             cursor.execute('''
                 UPDATE transactions 
@@ -65,7 +66,7 @@ class GatingEngine:
             cursor.execute('''
                 INSERT INTO audit_log (transaction_id, action, details, is_live_api_call)
                 VALUES (?, ?, ?, 0)
-            ''', (tx_id, "HUMAN_REJECTED", f"Reviewer ({reviewer}) rejected flagged transaction. Incentive declined.", 0))
+            ''', (tx_id, "HUMAN_REJECTED", details, 0))
 
         conn.commit()
         conn.close()
