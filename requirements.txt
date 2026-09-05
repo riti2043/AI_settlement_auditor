@@ -3,3 +3,5 @@ pandas>=2.0.0
 razorpay>=1.4.0
 groq>=0.4.0
 python-dotenv>=1.0.0
+fastapi>=0.100.0
+uvicorn>=0.23.0
