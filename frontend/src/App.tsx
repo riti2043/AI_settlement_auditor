@@ -229,69 +229,101 @@ export default function App() {
 
       {/* --- HERO SECTION --- */}
       <div className="pt-14 pb-10">
-        {/* Top: headline + stat cards side by side */}
-        <div className="grid grid-cols-12 gap-10 items-start mb-10">
-          {/* Left: Headline block */}
-          <div className="col-span-7 space-y-5">
-            <div>
-              <h1 className="font-display text-[52px] font-bold text-white leading-[1.06] tracking-[-0.02em] mb-4">
-                Autonomous Settlement<br />Auditing for Razorpay<br />Merchants.
-              </h1>
-              <p className="text-[#71717A] text-base leading-relaxed max-w-lg">
-                Detect mismatches, explain failures in plain English, recover amounts within policy bounds, and log every decision for audit.
-              </p>
+        <div className="grid grid-cols-12 gap-12 items-start mb-10">
+          
+          {/* Left: Headline block + Features + Run Batch */}
+          <div className="col-span-8 space-y-10 pr-6">
+            <h1 className="font-display text-[52px] font-bold text-white leading-[1.06] tracking-[-0.02em]">
+              Autonomous Settlement<br />Auditing for Razorpay<br />Merchants.
+            </h1>
+
+            {/* 4 Bullet Points */}
+            <div className="grid grid-cols-2 gap-6">
+              <div className="flex items-start gap-3 group">
+                <div className="w-2 h-2 rounded-full bg-white mt-2 group-hover:scale-150 transition-transform"></div>
+                <span className="text-[#A1A1AA] text-lg font-medium group-hover:text-white transition-colors">Detect mismatches</span>
+              </div>
+              <div className="flex items-start gap-3 group">
+                <div className="w-2 h-2 rounded-full bg-white mt-2 group-hover:scale-150 transition-transform"></div>
+                <span className="text-[#A1A1AA] text-lg font-medium group-hover:text-white transition-colors">Explain failures<br/>in plain English</span>
+              </div>
+              <div className="flex items-start gap-3 group">
+                <div className="w-2 h-2 rounded-full bg-white mt-2 group-hover:scale-150 transition-transform"></div>
+                <span className="text-[#A1A1AA] text-lg font-medium group-hover:text-white transition-colors">Recover amounts within<br/>policy bounds</span>
+              </div>
+              <div className="flex items-start gap-3 group">
+                <div className="w-2 h-2 rounded-full bg-white mt-2 group-hover:scale-150 transition-transform"></div>
+                <span className="text-[#A1A1AA] text-lg font-medium group-hover:text-white transition-colors">Log every decision<br/>for audit.</span>
+              </div>
             </div>
 
-            <div className="border border-[rgba(255,255,255,0.07)] bg-[#0d0d10] rounded-2xl p-5 max-w-lg">
-              <p className="text-[13px] text-[#52525B] leading-[1.75] mb-4">
-                Running a batch pulls 10 live transactions from the Razorpay test environment, reconciles each against your expected ledger, and dispatches bounded recovery actions for known failure types. Anything out of policy is held for your review before any money moves.
-              </p>
+            {/* Run Batch Box */}
+            <div className="border border-[rgba(255,255,255,0.07)] bg-[#0d0d10] rounded-2xl p-6">
               <button
-                className="btn-gold-primary w-full justify-center font-display tracking-wide"
+                className="btn-gold-primary mb-5 font-display tracking-wide"
                 onClick={handleRunBatch}
                 disabled={loadingBatch}
               >
                 {loadingBatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
                 <span>{loadingBatch ? 'Running Batch...' : 'Run New Batch'}</span>
               </button>
+              <p className="text-[14px] text-[#71717A] leading-[1.75]">
+                Running a batch pulls 10 live transactions from the Razorpay test environment, reconciles each against your expected ledger, and dispatches bounded recovery actions for known failure types. Anything out of policy is held for your review before any money moves.
+              </p>
             </div>
           </div>
 
-          {/* Right: Stat cards */}
-          <div className="col-span-5 grid grid-cols-2 gap-3">
+          {/* Right: Stacked Stat cards + Exec Summary */}
+          <div className="col-span-4 flex flex-col gap-4">
             {/* Card 1 */}
-            <div className="relative bg-[#0d0d10] border border-[rgba(255,255,255,0.07)] rounded-2xl p-5 overflow-hidden group hover:border-[rgba(255,255,255,0.14)] transition-colors">
+            <div className="relative bg-[#0d0d10] border border-[rgba(255,255,255,0.07)] rounded-xl p-5 overflow-hidden group hover:border-[rgba(255,255,255,0.14)] transition-colors">
               <div className="absolute top-0 right-0 w-24 h-24 bg-white opacity-[0.02] rounded-bl-full group-hover:scale-110 transition-transform"></div>
-              <div className="text-[11px] font-mono text-[#52525B] uppercase tracking-widest mb-3 relative z-10">Transactions Audited</div>
-              <div className="font-display text-[40px] font-bold text-white leading-none relative z-10">{metrics.total_processed}</div>
+              <div className="flex justify-between items-center relative z-10">
+                <div className="text-[11px] font-mono text-[#71717A] uppercase tracking-widest">Transactions Audited</div>
+                <div className="font-display text-2xl font-bold text-white leading-none">{metrics.total_processed}</div>
+              </div>
             </div>
 
             {/* Card 2 */}
-            <div className="relative bg-[#0d0d10] border border-[rgba(201,162,39,0.2)] rounded-2xl p-5 overflow-hidden group hover:border-[rgba(201,162,39,0.35)] transition-colors">
+            <div className="relative bg-[#0d0d10] border border-[rgba(201,162,39,0.2)] rounded-xl p-5 overflow-hidden group hover:border-[rgba(201,162,39,0.35)] transition-colors">
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#C9A227] opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
-              <div className="text-[11px] font-mono text-[#C9A227] uppercase tracking-widest mb-3 relative z-10">Amount Recovered</div>
-              <div className="font-display text-[40px] font-bold text-[#C9A227] leading-none relative z-10">
-                ₹{metrics.amount_recovered.toLocaleString('en-IN')}
+              <div className="flex justify-between items-center relative z-10">
+                <div className="text-[11px] font-mono text-[#C9A227] uppercase tracking-widest">Amount Recovered</div>
+                <div className="font-display text-2xl font-bold text-[#C9A227] leading-none">
+                  ₹{metrics.amount_recovered.toLocaleString('en-IN')}
+                </div>
               </div>
             </div>
 
             {/* Card 3 — clickable */}
             <div
-              className="relative bg-[#0d0d10] border border-[rgba(245,158,11,0.2)] rounded-2xl p-5 overflow-hidden group cursor-pointer hover:border-[rgba(245,158,11,0.4)] transition-colors"
+              className="relative bg-[#0d0d10] border border-[rgba(245,158,11,0.2)] rounded-xl p-5 overflow-hidden group cursor-pointer hover:border-[rgba(245,158,11,0.4)] transition-colors"
               onClick={() => setActiveTab('flagged')}
             >
               <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500 opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
-              <div className="text-[11px] font-mono text-amber-500 uppercase tracking-widest mb-3 flex items-center gap-1 relative z-10">
-                Pending Review <ArrowRight className="w-3 h-3" />
+              <div className="flex justify-between items-center relative z-10">
+                <div className="text-[11px] font-mono text-amber-500 uppercase tracking-widest flex items-center gap-1">
+                  Pending Review <ArrowRight className="w-3 h-3" />
+                </div>
+                <div className="font-display text-2xl font-bold text-amber-400 leading-none">{metrics.pending_approval}</div>
               </div>
-              <div className="font-display text-[40px] font-bold text-amber-400 leading-none relative z-10">{metrics.pending_approval}</div>
             </div>
 
             {/* Card 4 */}
-            <div className="relative bg-[#0d0d10] border border-[rgba(239,68,68,0.15)] rounded-2xl p-5 overflow-hidden group hover:border-[rgba(239,68,68,0.3)] transition-colors">
+            <div className="relative bg-[#0d0d10] border border-[rgba(239,68,68,0.15)] rounded-xl p-5 overflow-hidden group hover:border-[rgba(239,68,68,0.3)] transition-colors">
               <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500 opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
-              <div className="text-[11px] font-mono text-rose-500 uppercase tracking-widest mb-3 relative z-10">Mismatches Detected</div>
-              <div className="font-display text-[40px] font-bold text-white leading-none relative z-10">{metrics.mismatches_detected}</div>
+              <div className="flex justify-between items-center relative z-10">
+                <div className="text-[11px] font-mono text-rose-500 uppercase tracking-widest">Mismatches Detected</div>
+                <div className="font-display text-2xl font-bold text-white leading-none">{metrics.mismatches_detected}</div>
+              </div>
+            </div>
+
+            {/* Executive Summary Card */}
+            <div className="relative bg-[#0d0d10] border border-[rgba(255,255,255,0.07)] rounded-xl p-5 mt-2">
+              <div className="text-[11px] font-mono text-white uppercase tracking-widest mb-3">Executive Summary</div>
+              <div className="text-[13px] text-[#71717A] leading-relaxed">
+                {metrics.total_processed === 0 ? "AI Auditor standing by. Ready for batch ingestion." : `Audited ${metrics.total_processed} transactions. Detected ${metrics.mismatches_detected} mismatches and recovered ₹${metrics.amount_recovered.toLocaleString('en-IN')}.`}
+              </div>
             </div>
           </div>
         </div>
