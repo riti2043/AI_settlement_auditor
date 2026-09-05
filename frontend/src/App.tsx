@@ -228,49 +228,71 @@ export default function App() {
       </div>
 
       {/* --- HERO SECTION --- */}
-      <div className="pt-16 pb-12 grid grid-cols-12 gap-12 items-center">
-        <div className="col-span-7 space-y-6">
-          <h1 className="text-5xl font-extrabold text-[#FFFFFF] leading-[1.1] tracking-tight font-display">
-            Autonomous Settlement Auditing for Razorpay Merchants.
-          </h1>
-          <p className="text-[#A1A1AA] text-lg leading-relaxed max-w-2xl font-light">
-            Detect mismatches. Explain failures in plain English. Recover amounts within bounds. Log everything.
-          </p>
-          <div className="pt-4 p-4 rounded-xl border border-[rgba(255,255,255,0.05)] bg-[#121215] max-w-xl">
-            <p className="text-sm text-zinc-400 leading-relaxed mb-4">
-              When you run a new batch, the system pulls 10 transactions across multiple failure scenarios from the Razorpay test environment, checks each one against your expected ledger, and attempts bounded recovery actions where the failure type is known and safe to handle automatically. Anything unusual or above your configured thresholds is held for your review before any action is taken.
-            </p>
-            <button className="btn-gold-primary w-full justify-center" onClick={handleRunBatch} disabled={loadingBatch}>
-              {loadingBatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
-              <span>{loadingBatch ? 'Running Batch...' : 'Run New Batch'}</span>
-            </button>
-          </div>
-        </div>
+      <div className="pt-14 pb-10">
+        {/* Top: headline + stat cards side by side */}
+        <div className="grid grid-cols-12 gap-10 items-start mb-10">
+          {/* Left: Headline block */}
+          <div className="col-span-7 space-y-5">
+            <div>
+              <h1 className="font-display text-[52px] font-bold text-white leading-[1.06] tracking-[-0.02em] mb-4">
+                Autonomous Settlement<br />Auditing for Razorpay<br />Merchants.
+              </h1>
+              <p className="text-[#71717A] text-base leading-relaxed max-w-lg">
+                Detect mismatches, explain failures in plain English, recover amounts within policy bounds, and log every decision for audit.
+              </p>
+            </div>
 
-        <div className="col-span-5 grid grid-cols-2 gap-4">
-          <div className="bg-[#121215] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-white opacity-[0.02] rounded-bl-full group-hover:scale-110 transition-transform"></div>
-            <div className="text-[#71717A] text-xs font-mono mb-2">Transactions Audited</div>
-            <div className="text-3xl font-bold text-white font-display">{metrics.total_processed}</div>
-          </div>
-          <div className="bg-[#121215] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-[#C9A227] opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
-            <div className="text-[#C9A227] text-xs font-mono mb-2 uppercase tracking-wider">Amount Recovered</div>
-            <div className="text-3xl font-bold text-[#C9A227] font-display">
-              ₹{metrics.amount_recovered.toLocaleString('en-IN')}
+            <div className="border border-[rgba(255,255,255,0.07)] bg-[#0d0d10] rounded-2xl p-5 max-w-lg">
+              <p className="text-[13px] text-[#52525B] leading-[1.75] mb-4">
+                Running a batch pulls 10 live transactions from the Razorpay test environment, reconciles each against your expected ledger, and dispatches bounded recovery actions for known failure types. Anything out of policy is held for your review before any money moves.
+              </p>
+              <button
+                className="btn-gold-primary w-full justify-center font-display tracking-wide"
+                onClick={handleRunBatch}
+                disabled={loadingBatch}
+              >
+                {loadingBatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
+                <span>{loadingBatch ? 'Running Batch...' : 'Run New Batch'}</span>
+              </button>
             </div>
           </div>
-          <div className="bg-[#121215] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl relative overflow-hidden group cursor-pointer hover:border-amber-500/50 transition-colors" onClick={() => setActiveTab('flagged')}>
-            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500 opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
-            <div className="text-amber-500 text-xs font-mono mb-2 flex items-center gap-2">
-              Pending Human Approval <ArrowRight className="w-3 h-3" />
+
+          {/* Right: Stat cards */}
+          <div className="col-span-5 grid grid-cols-2 gap-3">
+            {/* Card 1 */}
+            <div className="relative bg-[#0d0d10] border border-[rgba(255,255,255,0.07)] rounded-2xl p-5 overflow-hidden group hover:border-[rgba(255,255,255,0.14)] transition-colors">
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-[rgba(255,255,255,0.08)]" />
+              <div className="text-[11px] font-mono text-[#52525B] uppercase tracking-widest mb-3">Transactions Audited</div>
+              <div className="font-display text-[40px] font-bold text-white leading-none">{metrics.total_processed}</div>
             </div>
-            <div className="text-3xl font-bold text-amber-500 font-display">{metrics.pending_approval}</div>
-          </div>
-          <div className="bg-[#121215] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500 opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
-            <div className="text-rose-400 text-xs font-mono mb-2">Mismatches Detected</div>
-            <div className="text-3xl font-bold text-white font-display">{metrics.mismatches_detected}</div>
+
+            {/* Card 2 */}
+            <div className="relative bg-[#0d0d10] border border-[rgba(201,162,39,0.2)] rounded-2xl p-5 overflow-hidden group hover:border-[rgba(201,162,39,0.35)] transition-colors">
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-[#C9A227]" />
+              <div className="text-[11px] font-mono text-[#C9A227] uppercase tracking-widest mb-3">Amount Recovered</div>
+              <div className="font-display text-[40px] font-bold text-[#C9A227] leading-none">
+                ₹{metrics.amount_recovered.toLocaleString('en-IN')}
+              </div>
+            </div>
+
+            {/* Card 3 — clickable */}
+            <div
+              className="relative bg-[#0d0d10] border border-[rgba(245,158,11,0.2)] rounded-2xl p-5 overflow-hidden group cursor-pointer hover:border-[rgba(245,158,11,0.4)] transition-colors"
+              onClick={() => setActiveTab('flagged')}
+            >
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-amber-500" />
+              <div className="text-[11px] font-mono text-amber-500 uppercase tracking-widest mb-3 flex items-center gap-1">
+                Pending Review <ArrowRight className="w-3 h-3" />
+              </div>
+              <div className="font-display text-[40px] font-bold text-amber-400 leading-none">{metrics.pending_approval}</div>
+            </div>
+
+            {/* Card 4 */}
+            <div className="relative bg-[#0d0d10] border border-[rgba(239,68,68,0.15)] rounded-2xl p-5 overflow-hidden group hover:border-[rgba(239,68,68,0.3)] transition-colors">
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-rose-600" />
+              <div className="text-[11px] font-mono text-rose-500 uppercase tracking-widest mb-3">Mismatches Detected</div>
+              <div className="font-display text-[40px] font-bold text-white leading-none">{metrics.mismatches_detected}</div>
+            </div>
           </div>
         </div>
       </div>
