@@ -46,6 +46,27 @@ export default function App() {
   const [executing, setExecuting] = useState<boolean>(false);
   const [execResult, setExecResult] = useState<any>(null);
 
+  // Executive Summary Modal state
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [summaryText, setSummaryText] = useState<string>('');
+  const [loadingSummary, setLoadingSummary] = useState(false);
+
+  const openExecutiveSummaryModal = async () => {
+    setSummaryModalOpen(true);
+    setLoadingSummary(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/report`);
+      const data = await res.json();
+      if (data && data.report) {
+        setSummaryText(data.report);
+      }
+    } catch (err) {
+      console.error('Error fetching executive summary:', err);
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
   // QA floating chat
   const [qaOpen, setQaOpen] = useState(false);
   const [qaQuery, setQaQuery] = useState('');
@@ -220,63 +241,71 @@ export default function App() {
             <div className="text-xs text-[#71717A] mt-1 font-mono uppercase tracking-widest">Razorpay Open Track</div>
           </div>
         </div>
-        <div className="flex items-center gap-6">
-          <a href={`${API_BASE}/api/export-csv`} download className="text-xs text-[#C9A227] hover:text-white transition-colors flex items-center gap-2">
-            <Download className="w-3 h-3" /> Export Audit Log
+        <div className="flex items-center gap-3">
+          <a 
+            href={`${API_BASE}/api/export-pdf`} 
+            download="AI_Settlement_Executive_Report.pdf" 
+            className="text-xs text-[#C9A227] hover:text-white transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A227]/10 hover:bg-[#C9A227]/20 border border-[#C9A227]/25 font-mono"
+            title="Download Official Audit PDF Report"
+          >
+            <FileText className="w-3.5 h-3.5" /> Executive PDF
+          </a>
+          <a href={`${API_BASE}/api/export-csv`} download className="text-xs text-[#71717A] hover:text-white transition-colors flex items-center gap-1.5 px-2.5 py-1.5 font-mono">
+            <Download className="w-3 h-3" /> Export CSV
           </a>
         </div>
       </div>
 
       {/* --- HERO SECTION --- */}
-      <div className="pt-14 pb-10">
-        <div className="grid grid-cols-12 gap-12 items-start mb-10">
+      <div className="pt-6 pb-6">
+        <div className="grid grid-cols-12 gap-8 items-start mb-6">
           
           {/* Left: Headline block + Features + Run Batch */}
-          <div className="col-span-8 space-y-10 pr-6">
-            <h1 className="font-display text-[52px] font-bold text-white leading-[1.06] tracking-[-0.02em]">
+          <div className="col-span-7 space-y-3.5 pr-2">
+            <h1 className="font-display text-4xl lg:text-[42px] font-bold text-white leading-[1.08] tracking-[-0.02em]">
               Autonomous Settlement<br />Auditing for Razorpay<br />Merchants.
             </h1>
 
-            {/* 4 Bullet Points */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="flex items-start gap-3 group">
-                <div className="w-2 h-2 rounded-full bg-white mt-2 group-hover:scale-150 transition-transform"></div>
-                <span className="text-[#A1A1AA] text-lg font-medium group-hover:text-white transition-colors">Detect mismatches</span>
+            {/* 4 Bullet Points - Compact & Tight */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 py-0.5">
+              <div className="flex items-center gap-2 group">
+                <span className="text-[#C9A227] text-xs font-mono font-bold">›</span>
+                <span className="text-[#A1A1AA] text-sm font-medium group-hover:text-white transition-colors">Detect mismatches</span>
               </div>
-              <div className="flex items-start gap-3 group">
-                <div className="w-2 h-2 rounded-full bg-white mt-2 group-hover:scale-150 transition-transform"></div>
-                <span className="text-[#A1A1AA] text-lg font-medium group-hover:text-white transition-colors">Explain failures<br/>in plain English</span>
+              <div className="flex items-center gap-2 group">
+                <span className="text-[#C9A227] text-xs font-mono font-bold">›</span>
+                <span className="text-[#A1A1AA] text-sm font-medium group-hover:text-white transition-colors">Explain failures in plain English</span>
               </div>
-              <div className="flex items-start gap-3 group">
-                <div className="w-2 h-2 rounded-full bg-white mt-2 group-hover:scale-150 transition-transform"></div>
-                <span className="text-[#A1A1AA] text-lg font-medium group-hover:text-white transition-colors">Recover amounts within<br/>policy bounds</span>
+              <div className="flex items-center gap-2 group">
+                <span className="text-[#C9A227] text-xs font-mono font-bold">›</span>
+                <span className="text-[#A1A1AA] text-sm font-medium group-hover:text-white transition-colors">Recover amounts within policy bounds</span>
               </div>
-              <div className="flex items-start gap-3 group">
-                <div className="w-2 h-2 rounded-full bg-white mt-2 group-hover:scale-150 transition-transform"></div>
-                <span className="text-[#A1A1AA] text-lg font-medium group-hover:text-white transition-colors">Log every decision<br/>for audit.</span>
+              <div className="flex items-center gap-2 group">
+                <span className="text-[#C9A227] text-xs font-mono font-bold">›</span>
+                <span className="text-[#A1A1AA] text-sm font-medium group-hover:text-white transition-colors">Log every decision for audit</span>
               </div>
             </div>
 
-            {/* Run Batch Box */}
-            <div className="border border-[rgba(255,255,255,0.07)] bg-[#0d0d10] rounded-2xl p-6">
+            {/* Run Batch Box - Tight & Elevated */}
+            <div className="border border-[rgba(255,255,255,0.07)] bg-[#0d0d10] rounded-xl p-4 sm:p-5">
               <button
-                className="btn-gold-primary mb-5 font-display tracking-wide"
+                className="btn-gold-primary mb-2.5 font-display tracking-wide py-2.5 px-5 text-sm"
                 onClick={handleRunBatch}
                 disabled={loadingBatch}
               >
                 {loadingBatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
                 <span>{loadingBatch ? 'Running Batch...' : 'Run New Batch'}</span>
               </button>
-              <p className="text-[14px] text-[#71717A] leading-[1.75]">
+              <p className="text-[12.5px] text-[#71717A] leading-relaxed">
                 Running a batch pulls 10 live transactions from the Razorpay test environment, reconciles each against your expected ledger, and dispatches bounded recovery actions for known failure types. Anything out of policy is held for your review before any money moves.
               </p>
             </div>
           </div>
 
-          {/* Right: Stacked Stat cards + Exec Summary */}
-          <div className="col-span-4 flex flex-col gap-4">
+          {/* Right: Stacked Stat cards + Active Exec Summary */}
+          <div className="col-span-5 flex flex-col gap-2.5">
             {/* Card 1 */}
-            <div className="relative bg-[#0d0d10] border border-[rgba(255,255,255,0.07)] rounded-xl p-5 overflow-hidden group hover:border-[rgba(255,255,255,0.14)] transition-colors">
+            <div className="relative bg-[#0d0d10] border border-[rgba(255,255,255,0.07)] rounded-xl p-3.5 overflow-hidden group hover:border-[rgba(255,255,255,0.14)] transition-colors">
               <div className="absolute top-0 right-0 w-24 h-24 bg-white opacity-[0.02] rounded-bl-full group-hover:scale-110 transition-transform"></div>
               <div className="flex justify-between items-center relative z-10">
                 <div className="text-[11px] font-mono text-[#71717A] uppercase tracking-widest">Transactions Audited</div>
@@ -285,7 +314,7 @@ export default function App() {
             </div>
 
             {/* Card 2 */}
-            <div className="relative bg-[#0d0d10] border border-[rgba(201,162,39,0.2)] rounded-xl p-5 overflow-hidden group hover:border-[rgba(201,162,39,0.35)] transition-colors">
+            <div className="relative bg-[#0d0d10] border border-[rgba(201,162,39,0.2)] rounded-xl p-3.5 overflow-hidden group hover:border-[rgba(201,162,39,0.35)] transition-colors">
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#C9A227] opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
               <div className="flex justify-between items-center relative z-10">
                 <div className="text-[11px] font-mono text-[#C9A227] uppercase tracking-widest">Amount Recovered</div>
@@ -297,7 +326,7 @@ export default function App() {
 
             {/* Card 3 — clickable */}
             <div
-              className="relative bg-[#0d0d10] border border-[rgba(245,158,11,0.2)] rounded-xl p-5 overflow-hidden group cursor-pointer hover:border-[rgba(245,158,11,0.4)] transition-colors"
+              className="relative bg-[#0d0d10] border border-[rgba(245,158,11,0.2)] rounded-xl p-3.5 overflow-hidden group cursor-pointer hover:border-[rgba(245,158,11,0.4)] transition-colors"
               onClick={() => setActiveTab('flagged')}
             >
               <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500 opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
@@ -310,7 +339,7 @@ export default function App() {
             </div>
 
             {/* Card 4 */}
-            <div className="relative bg-[#0d0d10] border border-[rgba(239,68,68,0.15)] rounded-xl p-5 overflow-hidden group hover:border-[rgba(239,68,68,0.3)] transition-colors">
+            <div className="relative bg-[#0d0d10] border border-[rgba(239,68,68,0.15)] rounded-xl p-3.5 overflow-hidden group hover:border-[rgba(239,68,68,0.3)] transition-colors">
               <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500 opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
               <div className="flex justify-between items-center relative z-10">
                 <div className="text-[11px] font-mono text-rose-500 uppercase tracking-widest">Mismatches Detected</div>
@@ -318,11 +347,45 @@ export default function App() {
               </div>
             </div>
 
-            {/* Executive Summary Card */}
-            <div className="relative bg-[#0d0d10] border border-[rgba(255,255,255,0.07)] rounded-xl p-5 mt-2">
-              <div className="text-[11px] font-mono text-white uppercase tracking-widest mb-3">Executive Summary</div>
-              <div className="text-[13px] text-[#71717A] leading-relaxed">
-                {metrics.total_processed === 0 ? "AI Auditor standing by. Ready for batch ingestion." : `Audited ${metrics.total_processed} transactions. Detected ${metrics.mismatches_detected} mismatches and recovered ₹${metrics.amount_recovered.toLocaleString('en-IN')}.`}
+            {/* Executive Summary Active Interactive Card */}
+            <div className="relative bg-[#0d0d10] border border-[rgba(255,255,255,0.08)] hover:border-[#C9A227]/40 rounded-xl p-4 transition-all group">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[11px] font-mono text-white uppercase tracking-widest flex items-center gap-1.5 font-bold">
+                  <FileText className="w-3.5 h-3.5 text-[#C9A227]" />
+                  Executive Summary
+                </div>
+                <a
+                  href={`${API_BASE}/api/export-pdf`}
+                  download="AI_Settlement_Executive_Report.pdf"
+                  className="inline-flex items-center gap-1 text-[10px] font-mono text-[#C9A227] hover:text-white bg-[#C9A227]/10 hover:bg-[#C9A227]/20 border border-[#C9A227]/30 px-2 py-0.5 rounded transition-colors"
+                  title="Direct Download PDF Report"
+                >
+                  <Download className="w-3 h-3" />
+                  PDF
+                </a>
+              </div>
+              
+              <p className="text-[12px] text-[#71717A] leading-relaxed mb-3">
+                {metrics.total_processed === 0 
+                  ? "AI Auditor standing by. Ready for batch ingestion." 
+                  : `Audited ${metrics.total_processed} transactions. Detected ${metrics.mismatches_detected} mismatches with ₹${metrics.amount_recovered.toLocaleString('en-IN')} recovered.`}
+              </p>
+
+              <div className="flex items-center gap-2 pt-2 border-t border-[rgba(255,255,255,0.06)]">
+                <button
+                  onClick={openExecutiveSummaryModal}
+                  className="flex-1 py-1.5 text-xs font-mono text-white bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-colors text-center"
+                >
+                  View Summary
+                </button>
+                <a
+                  href={`${API_BASE}/api/export-pdf`}
+                  download="AI_Settlement_Executive_Report.pdf"
+                  className="flex-1 py-1.5 text-xs font-mono text-black font-bold bg-[#C9A227] hover:bg-[#DEB53A] rounded-lg transition-colors flex items-center justify-center gap-1 text-center"
+                >
+                  <Download className="w-3 h-3" />
+                  Export PDF
+                </a>
               </div>
             </div>
           </div>
@@ -764,6 +827,92 @@ export default function App() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- EXECUTIVE SUMMARY MODAL --- */}
+      {summaryModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0f0f13] border border-[rgba(255,255,255,0.12)] rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95">
+            <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-[#C9A227]/10 border border-[#C9A227]/30 flex items-center justify-center text-[#C9A227]">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Executive Audit Summary</h3>
+                  <div className="text-xs text-[#71717A] font-mono">Autonomous Batch Synthesis & Leadership Report</div>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSummaryModalOpen(false)}
+                className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+              {/* AI Executive Synthesis */}
+              <div className="bg-[#121215] border border-[rgba(255,255,255,0.08)] rounded-xl p-4">
+                <div className="text-xs font-mono text-[#C9A227] uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <span>AI Leadership Brief</span>
+                  {loadingSummary && <RefreshCw className="w-3 h-3 animate-spin" />}
+                </div>
+                <div className="text-sm text-zinc-300 leading-relaxed">
+                  {loadingSummary ? (
+                    <div className="flex items-center gap-2 py-4 text-zinc-500 text-sm">
+                      <RefreshCw className="w-4 h-4 animate-spin text-[#C9A227]" />
+                      Synthesizing executive findings across current batch...
+                    </div>
+                  ) : summaryText ? (
+                    summaryText
+                  ) : (
+                    `Audited ${metrics.total_processed} transactions against the ledger. Identified ${metrics.mismatches_detected} mismatches across fees and timing anomalies, with ₹${metrics.amount_recovered.toLocaleString('en-IN')} safely recovered via bounded recovery workflows.`
+                  )}
+                </div>
+              </div>
+
+              {/* Key Highlights Grid */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 text-center">
+                  <div className="text-[10px] text-zinc-500 font-mono uppercase mb-1">Audited Volume</div>
+                  <div className="text-xl font-bold text-white font-display">{metrics.total_processed} txs</div>
+                </div>
+                <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 text-center">
+                  <div className="text-[10px] text-[#C9A227] font-mono uppercase mb-1">Total Recovered</div>
+                  <div className="text-xl font-bold text-[#C9A227] font-display">₹{metrics.amount_recovered.toLocaleString('en-IN')}</div>
+                </div>
+                <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 text-center">
+                  <div className="text-[10px] text-amber-500 font-mono uppercase mb-1">Safety Held</div>
+                  <div className="text-xl font-bold text-amber-400 font-display">{metrics.pending_approval} items</div>
+                </div>
+              </div>
+
+              {/* Architectural Assurance */}
+              <div className="p-4 rounded-xl bg-zinc-950/60 border border-zinc-800 text-xs text-zinc-400 leading-relaxed">
+                <strong className="text-white">Safety Guarantee:</strong> All autonomous recovery actions operate within strict deterministic bounds (split links, dispute triggers, fee re-audits). Any out-of-bounds anomaly is halted and queued for manual human sign-off.
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex items-center gap-3">
+                <a
+                  href={`${API_BASE}/api/export-pdf`}
+                  download="AI_Settlement_Executive_Report.pdf"
+                  className="flex-1 btn-gold-primary justify-center text-sm py-2.5"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Official PDF Report
+                </a>
+                <button
+                  onClick={() => window.print()}
+                  className="btn-dark-secondary text-sm py-2.5 px-4"
+                >
+                  Print Report
+                </button>
+              </div>
             </div>
           </div>
         </div>
