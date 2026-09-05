@@ -261,16 +261,16 @@ export default function App() {
           <div className="col-span-5 grid grid-cols-2 gap-3">
             {/* Card 1 */}
             <div className="relative bg-[#0d0d10] border border-[rgba(255,255,255,0.07)] rounded-2xl p-5 overflow-hidden group hover:border-[rgba(255,255,255,0.14)] transition-colors">
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-[rgba(255,255,255,0.08)]" />
-              <div className="text-[11px] font-mono text-[#52525B] uppercase tracking-widest mb-3">Transactions Audited</div>
-              <div className="font-display text-[40px] font-bold text-white leading-none">{metrics.total_processed}</div>
+              <div className="absolute top-0 right-0 w-24 h-24 bg-white opacity-[0.02] rounded-bl-full group-hover:scale-110 transition-transform"></div>
+              <div className="text-[11px] font-mono text-[#52525B] uppercase tracking-widest mb-3 relative z-10">Transactions Audited</div>
+              <div className="font-display text-[40px] font-bold text-white leading-none relative z-10">{metrics.total_processed}</div>
             </div>
 
             {/* Card 2 */}
             <div className="relative bg-[#0d0d10] border border-[rgba(201,162,39,0.2)] rounded-2xl p-5 overflow-hidden group hover:border-[rgba(201,162,39,0.35)] transition-colors">
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-[#C9A227]" />
-              <div className="text-[11px] font-mono text-[#C9A227] uppercase tracking-widest mb-3">Amount Recovered</div>
-              <div className="font-display text-[40px] font-bold text-[#C9A227] leading-none">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-[#C9A227] opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
+              <div className="text-[11px] font-mono text-[#C9A227] uppercase tracking-widest mb-3 relative z-10">Amount Recovered</div>
+              <div className="font-display text-[40px] font-bold text-[#C9A227] leading-none relative z-10">
                 ₹{metrics.amount_recovered.toLocaleString('en-IN')}
               </div>
             </div>
@@ -280,18 +280,18 @@ export default function App() {
               className="relative bg-[#0d0d10] border border-[rgba(245,158,11,0.2)] rounded-2xl p-5 overflow-hidden group cursor-pointer hover:border-[rgba(245,158,11,0.4)] transition-colors"
               onClick={() => setActiveTab('flagged')}
             >
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-amber-500" />
-              <div className="text-[11px] font-mono text-amber-500 uppercase tracking-widest mb-3 flex items-center gap-1">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500 opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
+              <div className="text-[11px] font-mono text-amber-500 uppercase tracking-widest mb-3 flex items-center gap-1 relative z-10">
                 Pending Review <ArrowRight className="w-3 h-3" />
               </div>
-              <div className="font-display text-[40px] font-bold text-amber-400 leading-none">{metrics.pending_approval}</div>
+              <div className="font-display text-[40px] font-bold text-amber-400 leading-none relative z-10">{metrics.pending_approval}</div>
             </div>
 
             {/* Card 4 */}
             <div className="relative bg-[#0d0d10] border border-[rgba(239,68,68,0.15)] rounded-2xl p-5 overflow-hidden group hover:border-[rgba(239,68,68,0.3)] transition-colors">
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-rose-600" />
-              <div className="text-[11px] font-mono text-rose-500 uppercase tracking-widest mb-3">Mismatches Detected</div>
-              <div className="font-display text-[40px] font-bold text-white leading-none">{metrics.mismatches_detected}</div>
+              <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500 opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
+              <div className="text-[11px] font-mono text-rose-500 uppercase tracking-widest mb-3 relative z-10">Mismatches Detected</div>
+              <div className="font-display text-[40px] font-bold text-white leading-none relative z-10">{metrics.mismatches_detected}</div>
             </div>
           </div>
         </div>
