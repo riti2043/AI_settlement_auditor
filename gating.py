@@ -105,7 +105,7 @@ class GatingEngine:
             try:
                 res = self.explainer.client.chat.completions.create(
                     messages=[{"role": "user", "content": prompt}],
-                    model="openai/gpt-oss-20b",
+                    model="groq/compound-mini",
                     max_tokens=80
                 )
                 return res.choices[0].message.content.strip()
