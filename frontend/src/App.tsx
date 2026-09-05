@@ -33,7 +33,7 @@ const SESSION_ID = getOrCreateSessionId();
 
 // Wrapper so every fetch call includes the session header automatically
 function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  return apiFetch(`${path}`, {
+  return window.fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
