@@ -1,17 +1,16 @@
 import os
 import razorpay
-import sqlite3
 import random
 import json
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from database import get_db
 
 load_dotenv()
 
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "rzp_test_dummy")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "dummy_secret")
 
-DB_PATH = "auditor.db"
 
 class RazorpayGenerator:
     def __init__(self):
@@ -21,23 +20,13 @@ class RazorpayGenerator:
             print(f"Razorpay Client Init Warning: {e}")
             self.client = None
 
-    def generate_batch(self, count=7):
+    def generate_batch(self, count=10, session_id: str = "default"):
         """
-        Generates an expanded batch of test transactions featuring:
-        1. NORMAL_SETTLED
-        2. DECLINED_PAYMENT
-        3. DELAYED_SETTLEMENT
-        4. STUCK_REFUND
-        5. INCENTIVE_ANOMALY
-        6. PROMISE_TO_PAY
-        7. SUBSCRIPTION_PAYMENT_FAILED
-        8. TAX_MISMATCH
-        9. DUPLICATE_CHARGE
-        10. PAYMENT_CAPTURED_NOT_SETTLED
+        Generates a batch of test transactions tagged with session_id for tenant isolation.
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db()
         cursor = conn.cursor()
-        
+
         scenarios = [
             "NORMAL_SETTLED",
             "DECLINED_PAYMENT",
@@ -51,12 +40,12 @@ class RazorpayGenerator:
             "PAYMENT_CAPTURED_NOT_SETTLED"
         ]
 
+        # Always run all 10 scenarios in a single batch
+        count = len(scenarios)
+
         batch_results = []
         customers = ["cust_101", "cust_102", "cust_103", "cust_104", "cust_105"]
 
-        # Default count to length of scenarios so we hit all of them in a single batch
-        if count == 7: count = 10
-        
         for i in range(count):
             scenario = scenarios[i % len(scenarios)]
             tx_id = f"tx_live_{random.randint(10000, 99999)}"
@@ -64,7 +53,6 @@ class RazorpayGenerator:
             amount_rupees = random.choice([500, 1200, 2500, 4999, 8500])
             amount_paise = amount_rupees * 100
 
-            # Default attributes
             order_id = f"order_rzp_{random.randint(100, 999)}"
             payment_id = f"pay_rzp_{random.randint(100, 999)}"
             refund_id = None
@@ -74,7 +62,6 @@ class RazorpayGenerator:
             tax_mismatch = False
             confidence_note = "Generated initial ledger record."
 
-            # Real Razorpay Order Creation if keys present
             if self.client and not RAZORPAY_KEY_ID.startswith("rzp_test_dummy"):
                 try:
                     order_data = {"amount": amount_paise, "currency": "INR", "receipt": f"receipt_{tx_id}"}
@@ -98,7 +85,6 @@ class RazorpayGenerator:
                 bank_fee = round(amount_rupees * 0.005, 2)
                 gst = round((gw_fee + bank_fee) * 0.18, 2)
                 net_settled = round(amount_rupees - (gw_fee + bank_fee + gst), 2)
-                
                 fee_breakdown = json.dumps({
                     "gross_amount": amount_rupees,
                     "gateway_fee": gw_fee,
@@ -129,13 +115,12 @@ class RazorpayGenerator:
                 status = "Flagged"
                 failure_reason = "HIGH_INCENTIVE_OFFER"
                 flagged = True
-                flag_reason = "Requested retry incentive (₹250 waiver) exceeds threshold for customer tier."
+                flag_reason = "Requested retry incentive (Rs.250 waiver) exceeds threshold for customer tier."
                 action_taken = "Paused for Human Approval"
 
             elif scenario == "PROMISE_TO_PAY":
                 status = "Mismatched"
                 failure_reason = "PROMISE_TO_PAY_PENDING"
-                # Overdue date (2 days ago) to trigger broken promise logic
                 due_date = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
                 action_taken = "Tracking Payment Commitment"
 
@@ -148,10 +133,9 @@ class RazorpayGenerator:
                 status = "Mismatched"
                 failure_reason = "TAX_CALCULATION_DISCREPANCY"
                 tax_mismatch = True
-                # Intentionally wrong GST (e.g. ₹5.00 instead of correct value)
                 gw_fee = round(amount_rupees * 0.02, 2)
                 bank_fee = round(amount_rupees * 0.005, 2)
-                gst = 5.00  # Incorrect GST
+                gst = 5.00  # Intentionally wrong
                 net_settled = round(amount_rupees - (gw_fee + bank_fee + gst), 2)
                 fee_breakdown = json.dumps({
                     "gross_amount": amount_rupees,
@@ -165,37 +149,41 @@ class RazorpayGenerator:
             elif scenario == "DUPLICATE_CHARGE":
                 status = "Mismatched"
                 customer_id = "cust_101"
-                amount_rupees = 2500  # Fixed amount for duplicate check
+                amount_rupees = 2500
                 failure_reason = "DUPLICATE_CHARGE_SUSPECTED"
                 action_taken = "Flagged: Potential Duplicate Charge"
-            
+
             elif scenario == "PAYMENT_CAPTURED_NOT_SETTLED":
                 status = "Mismatched"
                 failure_reason = "PAYMENT_CAPTURED_NOT_SETTLED"
-                settlement_id = None # Captured but no settlement
+                settlement_id = None
                 action_taken = "Pending Recovery: Missing Settlement"
 
             cursor.execute('''
                 INSERT OR REPLACE INTO transactions (
-                    id, customer_id, amount, currency, status, payment_id, order_id, refund_id, 
-                    settlement_id, failure_reason, fee_breakdown, action_taken, 
-                    flagged, flag_reason, due_date, tax_mismatch, confidence_note, 
-                    is_live_api_call, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    id, session_id, customer_id, amount, currency, status,
+                    payment_id, order_id, refund_id, settlement_id,
+                    failure_reason, fee_breakdown, action_taken,
+                    flagged, flag_reason, due_date, tax_mismatch,
+                    confidence_note, is_live_api_call, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                tx_id, customer_id, amount_rupees, "INR", status, payment_id, order_id, refund_id,
-                settlement_id, failure_reason, fee_breakdown, action_taken,
-                flagged, flag_reason, due_date, tax_mismatch, confidence_note,
-                is_live_api, datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                tx_id, session_id, customer_id, amount_rupees, "INR", status,
+                payment_id, order_id, refund_id, settlement_id,
+                failure_reason, fee_breakdown, action_taken,
+                flagged, flag_reason, due_date, tax_mismatch,
+                confidence_note, is_live_api,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             ))
 
             cursor.execute('''
-                INSERT INTO audit_log (transaction_id, action, details, is_live_api_call)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO audit_log (session_id, transaction_id, action, details, is_live_api_call)
+                VALUES (?, ?, ?, ?, ?)
             ''', (
-                tx_id, 
-                "TRANSACTION_GENERATED", 
-                f"Generated scenario: {scenario} for {customer_id} (Amount: ₹{amount_rupees})",
+                session_id,
+                tx_id,
+                "TRANSACTION_GENERATED",
+                f"Generated scenario: {scenario} for {customer_id} (Amount: Rs.{amount_rupees})",
                 is_live_api
             ))
 
@@ -211,7 +199,8 @@ class RazorpayGenerator:
         conn.close()
         return batch_results
 
+
 if __name__ == "__main__":
     generator = RazorpayGenerator()
-    results = generator.generate_batch(7)
-    print(f"Generated Batch with {len(results)} scenarios.")
+    results = generator.generate_batch(session_id="test_session")
+    print(f"Generated batch with {len(results)} scenarios.")

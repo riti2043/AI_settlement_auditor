@@ -8,13 +8,17 @@ from reportlab.lib import colors
 
 DB_PATH = 'auditor.db'
 
-def generate_pdf_report():
+def generate_pdf_report(session_id: str = "default"):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM transactions ORDER BY updated_at DESC')
+    cursor.execute(
+        'SELECT * FROM transactions WHERE session_id = ? ORDER BY updated_at DESC',
+        (session_id,)
+    )
     tx_rows = [dict(r) for r in cursor.fetchall()]
     conn.close()
+
 
     total_processed = len(tx_rows)
     mismatches = [t for t in tx_rows if t.get('status') in ['Mismatched', 'Recovered', 'Flagged', 'BROKEN_PROMISE']]
