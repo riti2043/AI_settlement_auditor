@@ -17,7 +17,32 @@ import {
 } from 'lucide-react';
 import { Transaction, Metrics, TxDetail, AuditLogEntry } from './types';
 
-const API_BASE = 'https://ai-settlement-auditor.onrender.com';
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'https://ai-settlement-auditor.onrender.com';
+
+// Persistent session ID — one per browser tab / localStorage slot
+function getOrCreateSessionId(): string {
+  let sid = localStorage.getItem('aisa_session_id');
+  if (!sid) {
+    sid = crypto.randomUUID();
+    localStorage.setItem('aisa_session_id', sid);
+  }
+  return sid;
+}
+
+const SESSION_ID = getOrCreateSessionId();
+
+// Wrapper so every fetch call includes the session header automatically
+function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  return apiFetch(`${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Session-ID': SESSION_ID,
+      ...(options.headers || {})
+    }
+  });
+}
+
 
 const PIPELINE_STEPS = [
   { id: 'api', name: 'Razorpay API', desc: 'Pulls raw transaction and settlement data directly from Razorpay.' },
@@ -55,7 +80,7 @@ export default function App() {
     setSummaryModalOpen(true);
     setLoadingSummary(true);
     try {
-      const res = await fetch(`${API_BASE}/api/report`);
+      const res = await apiFetch(`/api/report`);
       const data = await res.json();
       if (data && data.report) {
         setSummaryText(data.report);
@@ -79,7 +104,7 @@ export default function App() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/transactions`);
+      const res = await apiFetch(`/api/transactions`);
       const data = await res.json();
       setMetrics(data.metrics || {});
       setTransactions(data.transactions || []);
@@ -90,7 +115,7 @@ export default function App() {
 
   const fetchAuditLog = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/audit-log`);
+      const res = await apiFetch(`/api/audit-log`);
       const data = await res.json();
       setAuditLog(data.audit_log || []);
     } catch (err) {
@@ -106,7 +131,7 @@ export default function App() {
     setLoadingBatch(true);
     setBatchResult(null);
     try {
-      const res = await fetch(`${API_BASE}/api/batch/run`, { method: 'POST' });
+      const res = await apiFetch(`/api/batch/run`, { method: 'POST' });
       const data = await res.json();
       setBatchResult(data);
       await fetchData();
@@ -123,7 +148,7 @@ export default function App() {
     setExecResult(null);
     setLoadingTx(true);
     try {
-      const res = await fetch(`${API_BASE}/api/transaction/${tx.id}`);
+      const res = await apiFetch(`/api/transaction/${tx.id}`);
       const data = await res.json();
       setTxDetail(data);
     } catch (err) {
@@ -143,7 +168,7 @@ export default function App() {
     if (!selectedTx) return;
     setExecuting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/transaction/${selectedTx.id}/execute`, {
+      const res = await apiFetch(`/api/transaction/${selectedTx.id}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cause })
@@ -160,7 +185,7 @@ export default function App() {
 
   const handleApprove = async (txId: string, decision: string) => {
     try {
-      await fetch(`${API_BASE}/api/approve`, {
+      await apiFetch(`/api/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tx_id: txId, decision })
@@ -177,7 +202,7 @@ export default function App() {
     if (!qaQuery.trim()) return;
     setLoadingQA(true);
     try {
-      const res = await fetch(`${API_BASE}/api/qa`, {
+      const res = await apiFetch(`/api/qa`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: qaQuery })
