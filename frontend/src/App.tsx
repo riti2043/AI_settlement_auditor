@@ -12,14 +12,26 @@ import {
   ArrowRight,
   ShieldAlert,
   MessageCircle,
-  X
+  X,
+  ChevronRight
 } from 'lucide-react';
 import { Transaction, Metrics, TxDetail, AuditLogEntry } from './types';
 
 const API_BASE = 'https://ai-settlement-auditor.onrender.com';
 
+const PIPELINE_STEPS = [
+  { id: 'api', name: 'Razorpay API', desc: 'Pulls raw transaction and settlement data directly from Razorpay.' },
+  { id: 'recon', name: 'Reconciliation', desc: 'Compares gateway data against internal merchant ledger expectations.' },
+  { id: 'anomaly', name: 'Anomaly Detection', desc: 'Identifies missing funds, fee mismatches, or stuck refunds.' },
+  { id: 'llm', name: 'LLM Analysis', desc: 'Groq translates complex failure codes into plain English context.' },
+  { id: 'rules', name: 'Rules Engine', desc: 'Determines bounded recovery actions based on deterministic policies.' },
+  { id: 'gate', name: 'Human Gate', desc: 'Pauses out-of-bounds or high-risk actions for manual merchant approval.' },
+  { id: 'audit', name: 'Audit Log', desc: 'Records every API call, AI explanation, and human decision immutably.' }
+];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'overview' | 'flagged' | 'audit'>('overview');
+  const [activePipelineStep, setActivePipelineStep] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<Metrics>({ total_processed: 0, mismatches_detected: 0, amount_recovered: 0, pending_approval: 0 });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
@@ -162,53 +174,35 @@ export default function App() {
     const st = String(status || '').trim();
     if (st === 'Settled') {
       return (
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-green-500"></span>
-          <span className="text-green-400 font-mono text-xs uppercase tracking-wider">captured · settled</span>
-        </div>
+        <span className="text-green-400 font-mono text-xs uppercase tracking-wider font-bold">captured · settled</span>
       );
     }
     if (st === 'Recovered') {
       return (
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-          <span className="text-emerald-400 font-mono text-xs uppercase tracking-wider">recovered</span>
-        </div>
+        <span className="text-emerald-400 font-mono text-xs uppercase tracking-wider font-bold">recovered</span>
       );
     }
     if (st === 'Flagged') {
       return (
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-          <span className="text-amber-400 font-mono text-xs uppercase tracking-wider">captured · flagged</span>
-        </div>
+        <span className="text-amber-400 font-mono text-xs uppercase tracking-wider font-bold animate-pulse">captured · flagged</span>
       );
     }
     if (st === 'BROKEN_PROMISE') {
       return (
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-          <span className="text-rose-400 font-mono text-xs uppercase tracking-wider">breach · escalated</span>
-        </div>
+        <span className="text-rose-400 font-mono text-xs uppercase tracking-wider font-bold">breach · escalated</span>
       );
     }
     if (st === 'Mismatched') {
       if (reason === 'PAYMENT_DECLINED_BANK') {
         return (
-          <div className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-red-500"></span>
-            <span className="text-red-400 font-mono text-xs uppercase tracking-wider">failed · mismatch detected</span>
-          </div>
+          <span className="text-red-400 font-mono text-xs uppercase tracking-wider font-bold">failed · mismatch detected</span>
         );
       }
       return (
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-[#C9A227]"></span>
-          <span className="text-[#C9A227] font-mono text-xs uppercase tracking-wider">authorized · mismatch detected</span>
-        </div>
+        <span className="text-[#C9A227] font-mono text-xs uppercase tracking-wider font-bold">authorized · mismatch detected</span>
       );
     }
-    return <span className="font-mono text-xs uppercase text-zinc-400">{st}</span>;
+    return <span className="font-mono text-xs uppercase text-zinc-400 font-bold">{st}</span>;
   };
 
   const flaggedTxs = transactions.filter(t => t.flagged === 1);
@@ -283,32 +277,38 @@ export default function App() {
 
       {/* --- PIPELINE STRIP --- */}
       {metrics.total_processed > 0 && (
-        <div className="mb-12 border-y border-[rgba(255,255,255,0.05)] py-6 bg-[#0a0a0c]">
-          <div className="flex items-center justify-between max-w-4xl mx-auto px-4">
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]"></div>
-              <span className="text-xs font-mono text-zinc-500 uppercase">Razorpay API</span>
+        <div className="mb-12">
+          <div className="mb-4">
+            <h3 className="text-white font-medium mb-1">System Architecture: The 7-Step Pipeline</h3>
+            <p className="text-sm text-zinc-400">Click on any stage below to understand how the agent processes transactions from ingestion to final audit. No steps are skipped.</p>
+          </div>
+          <div className="border border-[rgba(255,255,255,0.08)] rounded-xl bg-[#0a0a0c] p-6 relative">
+            <div className="flex items-center justify-between">
+              {PIPELINE_STEPS.map((step, index) => (
+                <React.Fragment key={step.id}>
+                  <div 
+                    className={`flex flex-col items-center gap-2 cursor-pointer group flex-1 transition-transform hover:-translate-y-1 ${activePipelineStep === step.id ? 'opacity-100' : 'opacity-70 hover:opacity-100'}`}
+                    onClick={() => setActivePipelineStep(activePipelineStep === step.id ? null : step.id)}
+                  >
+                    <div className={`text-xs font-mono font-bold uppercase text-center px-2 py-1 rounded transition-colors ${activePipelineStep === step.id ? 'bg-[#C9A227] text-black' : 'bg-zinc-900 text-zinc-400 group-hover:text-white'}`}>
+                      {step.name}
+                    </div>
+                  </div>
+                  {index < PIPELINE_STEPS.length - 1 && (
+                    <div className="text-zinc-700 flex-shrink-0 px-2">
+                      <ChevronRight className="w-4 h-4" />
+                    </div>
+                  )}
+                </React.Fragment>
+              ))}
             </div>
-            <div className="h-px bg-[rgba(255,255,255,0.1)] flex-1 mx-4"></div>
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]"></div>
-              <span className="text-xs font-mono text-zinc-500 uppercase">Reconciliation</span>
-            </div>
-            <div className="h-px bg-[rgba(255,255,255,0.1)] flex-1 mx-4"></div>
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]"></div>
-              <span className="text-xs font-mono text-zinc-500 uppercase">Anomaly Detected</span>
-            </div>
-            <div className="h-px bg-[rgba(255,255,255,0.1)] flex-1 mx-4"></div>
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]"></div>
-              <span className="text-xs font-mono text-zinc-500 uppercase">Human Gate</span>
-            </div>
-            <div className="h-px bg-[rgba(255,255,255,0.1)] flex-1 mx-4"></div>
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-zinc-400 shadow-[0_0_10px_rgba(161,161,170,0.3)]"></div>
-              <span className="text-xs font-mono text-zinc-500 uppercase">Audit Log</span>
-            </div>
+            
+            {activePipelineStep && (
+              <div className="mt-6 p-4 bg-[#121215] border border-[#C9A227]/30 rounded-lg text-sm text-zinc-300 animate-in fade-in slide-in-from-top-2">
+                <span className="text-[#C9A227] font-bold mr-2">{PIPELINE_STEPS.find(s => s.id === activePipelineStep)?.name}:</span>
+                {PIPELINE_STEPS.find(s => s.id === activePipelineStep)?.desc}
+              </div>
+            )}
           </div>
         </div>
       )}
