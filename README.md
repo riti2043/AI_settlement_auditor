@@ -2,6 +2,9 @@
 
 A full-stack autonomous settlement auditing and reconciliation platform designed to detect mismatches, explain financial failures in plain English, recover funds within policy bounds, and ensure absolute deterministic decision safety for Razorpay merchants.
 
+Live app:
+https://ai-settlement-auditor.vercel.app/
+
 ## Table of Contents
 
 - [Overview](#overview)
