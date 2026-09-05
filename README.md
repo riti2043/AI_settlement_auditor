@@ -9,7 +9,9 @@
 - [Our Solution](#our-solution)
 - [Key Features](#key-features)
 - [System Architecture](#system-architecture)
-- [The 7 Step Pipeline](#the-7-step-pipeline)
+- [How the Platform Works](#how-the-platform-works)
+- [Reconciliation Logic](#reconciliation-logic)
+- [Safety and Human Gating](#safety-and-human-gating)
 - [AI and Explainability](#ai-and-explainability)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
@@ -52,7 +54,7 @@ AI Settlement Auditor addresses these challenges by combining **deterministic ru
 
 AI Settlement Auditor provides a unified workflow:
 
-**Ingestion -> Reconciliation -> Detection -> AI Analysis -> Rule Evaluation -> Human Gating -> Audit Log**
+**Ingestion > Reconciliation > Detection > AI Analysis > Rule Evaluation > Human Gating > Audit Log**
 
 The system pulls transaction data and immediately reconciles it against expected values. The AI analyzes any anomalies to provide a clear explanation. If the issue is common and low risk, the deterministic rules engine executes a recovery action. If the issue is high risk or ambiguous, it is placed in a gated queue for human review. Every single action is recorded in an immutable audit log.
 
@@ -72,9 +74,6 @@ Any anomaly that falls outside of the approved automated policy bounds is flagge
 
 ### Executive Reporting
 The system generates automated PDF reports detailing the total transactions audited, mismatches detected, amounts successfully recovered, and the current compliance posture of the system.
-
-### Context Preserving Support Handoffs
-When an issue is escalated, the AI generates a concise handoff summary. This ensures that any human taking over the case immediately understands the problem without digging through technical logs.
 
 ## System Architecture
 
@@ -111,31 +110,48 @@ flowchart TD
     REPORT --> F
 `
 
-## Architecture Components
+## How the Platform Works
 
-| Component | Responsibility |
-|---|---|
-| **React Frontend** | User interface, metrics dashboard, pipeline visualization, and human review queue |
-| **FastAPI Backend** | Main backend, API routes, database management, and service orchestration |
-| **SQLite Database** | Stores transaction records, anomaly flags, and the immutable audit log |
-| **Razorpay Generator** | Simulates live transaction data, failures, and fees from the payment gateway |
-| **Reconciliation Engine** | Calculates expected vs actual amounts and detects state mismatches |
-| **Deterministic Rules** | Decides which recovery actions are safe to execute autonomously |
-| **Explainability Agent** | Interfaces with Groq to generate human readable summaries and context |
-| **Human Gating** | Halts unapproved money moving actions and awaits explicit administrator input |
-| **ReportLab Generator** | Compiles live data into downloadable executive PDF summaries |
+The core of the system operates on a strict 7 step pipeline to ensure financial safety and accurate tracking over time.
 
-## The 7 Step Pipeline
+`mermaid
+flowchart TD
+    1[1. Ingest Razorpay Data] --> 2[2. Reconcile with Ledger]
+    2 --> 3[3. Detect Anomalies]
+    3 --> 4[4. AI Generates Explanation]
+    4 --> 5[5. Evaluate Recovery Rules]
+    5 --> 6[6. Human Gating / Approval]
+    6 --> 7[7. Execute & Audit Log]
+`
 
-The core of the system operates on a strict sequence to ensure financial safety:
+## Reconciliation Logic
 
-1. **Razorpay API:** Pulls raw transaction and settlement data directly from the gateway.
-2. **Reconciliation:** Compares gateway data against internal merchant ledger expectations.
-3. **Anomaly Detection:** Identifies missing funds, fee mismatches, or stuck refunds.
-4. **LLM Analysis:** Groq translates complex failure codes into plain English context.
-5. **Rules Engine:** Determines bounded recovery actions based on deterministic policies.
-6. **Human Gate:** Pauses out-of-bounds or high-risk actions for manual merchant approval.
-7. **Audit Log:** Records every API call, AI explanation, and human decision immutably.
+The business logic of the application centers around verifying that the money received matches the money expected, factoring in all gateway deductions.
+
+`mermaid
+flowchart TD
+    A[Gateway Settlement Amount] --> B[Deduct Gateway Fees]
+    B --> C[Deduct Taxes]
+    C --> D[Calculate Expected Net]
+    D --> E{Expected == Actual Ledger?}
+    E -->|Yes| F[Mark as Reconciled]
+    E -->|No| G[Flag as Mismatch]
+`
+
+## Safety and Human Gating
+
+To guarantee absolute financial safety, the system prevents autonomous modules from executing high risk actions without human approval.
+
+`mermaid
+flowchart TD
+    A[Anomaly Detected] --> B{Is it a known safe error?}
+    B -->|Yes| C[Auto-Recover]
+    B -->|No| D[Suspend Transaction]
+    D --> E[Flag for Human Review]
+    E --> F{Administrator Decision}
+    F -->|Approve| G[Execute Recovery]
+    F -->|Reject| H[Halt & Log Failure]
+`
 
 ## AI and Explainability
 
@@ -158,7 +174,5 @@ Crucially, **the AI never makes financial decisions**. The core architectural ru
 3. Set your Groq API key in the .env file: GROQ_API_KEY=your_key_here
 4. Start the backend: python main.py
 5. Navigate to the frontend directory: cd frontend
-6. Install Node dependencies: 
-pm install
-7. Start the frontend: 
-pm run dev
+6. Install Node dependencies: npm install
+7. Start the frontend: npm run dev
