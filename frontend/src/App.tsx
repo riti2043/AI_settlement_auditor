@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Transaction, Metrics, TxDetail, AuditLogEntry } from './types';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://ai-settlement-auditor.onrender.com';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'overview' | 'detail' | 'flagged' | 'qa' | 'audit'>('overview');
