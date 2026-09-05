@@ -6,12 +6,14 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from database import init_db
 from razorpay_client import RazorpayGenerator
 from reconciliation import ReconciliationEngine
 from explain import ExplainabilityAgent
 from gating import GatingEngine
 
 DB_PATH = "auditor.db"
+init_db()
 
 app = FastAPI(
     title="AI Settlement Auditor API",
