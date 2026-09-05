@@ -190,6 +190,16 @@ def export_csv():
     csv_str = df.to_csv(index=False)
     return Response(content=csv_str, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=audit_log.csv"})
 
+@app.get("/api/export-pdf")
+def export_pdf():
+    from report_generator import generate_pdf_report
+    pdf_buffer = generate_pdf_report()
+    return Response(
+        content=pdf_buffer.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=AI_Settlement_Executive_Report.pdf"}
+    )
+
 if __name__ == "__main__":
     import uvicorn
     import os
