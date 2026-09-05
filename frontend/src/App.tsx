@@ -423,8 +423,37 @@ export default function App() {
                     {getRazorpayStatusBadge(tx.status, tx.failure_reason)}
                   </div>
                   <div className="p-4 bg-amber-950/20 border border-amber-900/50 rounded-lg mb-6">
-                    <div className="text-amber-500 text-sm font-medium mb-1">Consistency Check Flag</div>
-                    <div className="text-amber-400/80 text-sm">{tx.flag_reason}</div>
+                    <div className="text-amber-500 text-sm font-medium mb-2">Consistency Check Flag</div>
+                    <div className="text-amber-400/80 text-sm mb-4">{tx.flag_reason}</div>
+                    
+                    {tx.failure_reason === 'DUPLICATE_CHARGE_SUSPECTED' && (
+                      <div className="bg-black/30 p-3 rounded border border-amber-900/30 text-xs font-mono text-zinc-400">
+                        <div className="mb-1 text-zinc-300">Context provided for Review:</div>
+                        <div className="flex items-center gap-4 mt-2">
+                          <div className="flex-1 p-2 bg-zinc-900/50 rounded border border-zinc-800">
+                            <span className="text-zinc-500 block mb-1">Previous Charge (Settled)</span>
+                            tx_prev_12345<br/>₹{tx.amount}<br/>09:12 AM
+                          </div>
+                          <div className="text-amber-500">vs</div>
+                          <div className="flex-1 p-2 bg-amber-950/30 rounded border border-amber-900/50 text-amber-500">
+                            <span className="text-amber-600 block mb-1">Current Charge (Flagged)</span>
+                            {tx.id}<br/>₹{tx.amount}<br/>09:15 AM
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {tx.failure_reason === 'HIGH_INCENTIVE_OFFER' && (
+                      <div className="bg-black/30 p-3 rounded border border-amber-900/30 text-xs font-mono text-zinc-400">
+                        <div className="mb-1 text-zinc-300">Context provided for Review:</div>
+                        <ul className="list-disc list-inside mt-2 space-y-1">
+                          <li>Customer Tier: Basic</li>
+                          <li>Requested Waiver: ₹250</li>
+                          <li>Max Threshold for Tier: ₹100</li>
+                          <li>Historical Precedent: 0 approvals in last 30 days</li>
+                        </ul>
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-4">
                     <button className="flex-1 py-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium text-sm" onClick={() => handleApprove(tx.id, 'APPROVE')}>
