@@ -6,7 +6,7 @@ A full-stack autonomous settlement auditing and reconciliation platform designed
 
 - [Overview](#overview)
 - [Problem Statement](#problem-statement)
-- [Our Solution](#our-solution)
+- [Solution](#solution)
 - [Key Features](#key-features)
 - [System Architecture](#system-architecture)
 - [How the Platform Works](#how-the-platform-works)
@@ -54,7 +54,7 @@ AI Settlement Auditor addresses these challenges by combining deterministic rule
 
 ---
 
-## Our Solution
+## Solution
 
 AI Settlement Auditor provides a unified workflow:
 
