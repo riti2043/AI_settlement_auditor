@@ -158,17 +158,27 @@ export default function App() {
     }
   };
 
+  const [approving, setApproving] = useState<string | null>(null); // 'APPROVE' | 'REJECT' | null
+  const [approveResult, setApproveResult] = useState<{decision: string, txId: string} | null>(null);
+
   const handleApprove = async (txId: string, decision: string) => {
+    setApproving(decision);
     try {
       await fetch(`${API_BASE}/api/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tx_id: txId, decision })
       });
-      fetchData();
-      closeTxModal();
+      setApproveResult({ decision, txId });
+      await fetchData();
+      setTimeout(() => {
+        setApproveResult(null);
+        closeTxModal();
+      }, 1800);
     } catch (err) {
       console.error('Approval Error:', err);
+    } finally {
+      setApproving(null);
     }
   };
 
@@ -573,11 +583,19 @@ export default function App() {
                     )}
                   </div>
                   <div className="flex gap-4">
-                    <button className="flex-1 py-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium text-sm" onClick={() => handleApprove(tx.id, 'APPROVE')}>
-                      Approve Action
+                    <button
+                      disabled={approving !== null}
+                      className="flex-1 py-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium text-sm disabled:opacity-50"
+                      onClick={() => handleApprove(tx.id, 'APPROVE')}
+                    >
+                      {approving === 'APPROVE' ? 'Approving...' : 'Approve Action'}
                     </button>
-                    <button className="flex-1 py-2 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20 transition-colors font-medium text-sm" onClick={() => handleApprove(tx.id, 'REJECT')}>
-                      Reject & Escalate
+                    <button
+                      disabled={approving !== null}
+                      className="flex-1 py-2 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20 transition-colors font-medium text-sm disabled:opacity-50"
+                      onClick={() => handleApprove(tx.id, 'REJECT')}
+                    >
+                      {approving === 'REJECT' ? 'Rejecting...' : 'Reject & Escalate'}
                     </button>
                   </div>
                 </div>
@@ -669,7 +687,7 @@ export default function App() {
                     <Activity className="w-3 h-3" /> Support Handoff Summary
                   </div>
                   <div className="text-indigo-200/80 text-sm font-medium italic">
-                    "{txDetail.handoff_summary}"
+                    "{txDetail.handoff_summary.replace(/\*\*/g, '')}"
                   </div>
                 </div>
               )}
@@ -818,13 +836,29 @@ export default function App() {
 
               {/* Flagged actions if directly in flagged state */}
               {selectedTx.flagged === 1 && (
-                <div className="mt-6 border-t border-zinc-800 pt-6 flex gap-4">
-                  <button className="flex-1 py-3 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium" onClick={() => handleApprove(selectedTx.id, 'APPROVE')}>
-                    Approve Action
-                  </button>
-                  <button className="flex-1 py-3 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20 transition-colors font-medium" onClick={() => handleApprove(selectedTx.id, 'REJECT')}>
-                    Reject & Escalate
-                  </button>
+                <div className="mt-6 border-t border-zinc-800 pt-6">
+                  {approveResult ? (
+                    <div className={`w-full py-3 rounded-lg text-center font-bold text-sm ${approveResult.decision === 'APPROVE' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}>
+                      {approveResult.decision === 'APPROVE' ? 'Action approved. Recovery executing...' : 'Rejected and escalated. Logged to audit.'}
+                    </div>
+                  ) : (
+                    <div className="flex gap-4">
+                      <button
+                        disabled={approving !== null}
+                        className="flex-1 py-3 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium disabled:opacity-50"
+                        onClick={() => handleApprove(selectedTx.id, 'APPROVE')}
+                      >
+                        {approving === 'APPROVE' ? 'Approving...' : 'Approve Action'}
+                      </button>
+                      <button
+                        disabled={approving !== null}
+                        className="flex-1 py-3 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20 transition-colors font-medium disabled:opacity-50"
+                        onClick={() => handleApprove(selectedTx.id, 'REJECT')}
+                      >
+                        {approving === 'REJECT' ? 'Rejecting...' : 'Reject & Escalate'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
