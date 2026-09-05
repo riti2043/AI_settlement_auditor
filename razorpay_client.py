@@ -29,10 +29,11 @@ class RazorpayGenerator:
         3. DELAYED_SETTLEMENT
         4. STUCK_REFUND
         5. INCENTIVE_ANOMALY
-        6. PROMISE_TO_PAY (Past due date -> Broken Promise)
+        6. PROMISE_TO_PAY
         7. SUBSCRIPTION_PAYMENT_FAILED
-        8. TAX_MISMATCH (Faulty GST calculation)
+        8. TAX_MISMATCH
         9. DUPLICATE_CHARGE
+        10. PAYMENT_CAPTURED_NOT_SETTLED
         """
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -46,12 +47,16 @@ class RazorpayGenerator:
             "PROMISE_TO_PAY",
             "SUBSCRIPTION_PAYMENT_FAILED",
             "TAX_MISMATCH",
-            "DUPLICATE_CHARGE"
+            "DUPLICATE_CHARGE",
+            "PAYMENT_CAPTURED_NOT_SETTLED"
         ]
 
         batch_results = []
         customers = ["cust_101", "cust_102", "cust_103", "cust_104", "cust_105"]
 
+        # Default count to length of scenarios so we hit all of them in a single batch
+        if count == 7: count = 10
+        
         for i in range(count):
             scenario = scenarios[i % len(scenarios)]
             tx_id = f"tx_live_{random.randint(10000, 99999)}"
@@ -143,7 +148,7 @@ class RazorpayGenerator:
                 status = "Mismatched"
                 failure_reason = "TAX_CALCULATION_DISCREPANCY"
                 tax_mismatch = True
-                # Intentionally wrong GST (e.g. ₹5.00 instead of ₹11.25)
+                # Intentionally wrong GST (e.g. ₹5.00 instead of correct value)
                 gw_fee = round(amount_rupees * 0.02, 2)
                 bank_fee = round(amount_rupees * 0.005, 2)
                 gst = 5.00  # Incorrect GST
@@ -163,6 +168,12 @@ class RazorpayGenerator:
                 amount_rupees = 2500  # Fixed amount for duplicate check
                 failure_reason = "DUPLICATE_CHARGE_SUSPECTED"
                 action_taken = "Flagged: Potential Duplicate Charge"
+            
+            elif scenario == "PAYMENT_CAPTURED_NOT_SETTLED":
+                status = "Mismatched"
+                failure_reason = "PAYMENT_CAPTURED_NOT_SETTLED"
+                settlement_id = None # Captured but no settlement
+                action_taken = "Pending Recovery: Missing Settlement"
 
             cursor.execute('''
                 INSERT OR REPLACE INTO transactions (

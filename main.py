@@ -143,6 +143,16 @@ def get_transaction_detail(tx_id: str, beginner_mode: bool = False):
         "handoff_summary": handoff_summary
     }
 
+class ExecuteRequest(BaseModel):
+    cause: str
+
+@app.post("/api/transaction/{tx_id}/execute")
+def execute_transaction_action(tx_id: str, req: ExecuteRequest):
+    result = reconciler.execute_action(tx_id, req.cause)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("message"))
+    return result
+
 @app.post("/api/qa")
 def ask_auditor_qa(req: QARequest):
     if not req.query.strip():

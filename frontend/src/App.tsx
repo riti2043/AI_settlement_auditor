@@ -7,33 +7,38 @@ import {
   AlertTriangle, 
   ShieldCheck, 
   Download, 
-  Search, 
   RefreshCw, 
   Activity,
   ArrowRight,
-  Info,
-  Clock,
   ShieldAlert,
-  Check
+  MessageCircle,
+  X
 } from 'lucide-react';
 import { Transaction, Metrics, TxDetail, AuditLogEntry } from './types';
 
 const API_BASE = 'https://ai-settlement-auditor.onrender.com';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'detail' | 'flagged' | 'qa' | 'audit'>('overview');
-  const [beginnerMode, setBeginnerMode] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'flagged' | 'audit'>('overview');
   const [metrics, setMetrics] = useState<Metrics>({ total_processed: 0, mismatches_detected: 0, amount_recovered: 0, pending_approval: 0 });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [selectedTxId, setSelectedTxId] = useState<string>('');
-  const [txDetail, setTxDetail] = useState<TxDetail | null>(null);
-  const [qaQuery, setQaQuery] = useState<string>('');
-  const [qaAnswer, setQaAnswer] = useState<string>('');
-  const [execReport, setExecReport] = useState<string>('');
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [loadingBatch, setLoadingBatch] = useState<boolean>(false);
-  const [loadingReport, setLoadingReport] = useState<boolean>(false);
-  const [loadingQA, setLoadingQA] = useState<boolean>(false);
+  const [batchResult, setBatchResult] = useState<any>(null);
+  
+  // Modal state
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [txDetail, setTxDetail] = useState<TxDetail | null>(null);
+  const [loadingTx, setLoadingTx] = useState<boolean>(false);
+  
+  const [executing, setExecuting] = useState<boolean>(false);
+  const [execResult, setExecResult] = useState<any>(null);
+
+  // QA floating chat
+  const [qaOpen, setQaOpen] = useState(false);
+  const [qaQuery, setQaQuery] = useState('');
+  const [qaAnswer, setQaAnswer] = useState('');
+  const [loadingQA, setLoadingQA] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -45,34 +50,32 @@ export default function App() {
       const data = await res.json();
       setMetrics(data.metrics || {});
       setTransactions(data.transactions || []);
-      if (data.transactions && data.transactions.length > 0 && !selectedTxId) {
-        setSelectedTxId(data.transactions[0].id);
-      }
     } catch (err) {
       console.error('API Error:', err);
     }
   };
 
-  const fetchTxDetail = async (txId: string) => {
+  const fetchAuditLog = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/transaction/${txId}?beginner_mode=${beginnerMode}`);
+      const res = await fetch(`${API_BASE}/api/audit-log`);
       const data = await res.json();
-      setTxDetail(data);
+      setAuditLog(data.audit_log || []);
     } catch (err) {
-      console.error('Tx Detail Error:', err);
+      console.error('Audit Log Error:', err);
     }
   };
 
   useEffect(() => {
-    if (selectedTxId) {
-      fetchTxDetail(selectedTxId);
-    }
-  }, [selectedTxId, beginnerMode]);
+    if (activeTab === 'audit') fetchAuditLog();
+  }, [activeTab]);
 
   const handleRunBatch = async () => {
     setLoadingBatch(true);
+    setBatchResult(null);
     try {
-      await fetch(`${API_BASE}/api/batch/run`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/api/batch/run`, { method: 'POST' });
+      const data = await res.json();
+      setBatchResult(data);
       await fetchData();
     } catch (err) {
       console.error('Batch Run Error:', err);
@@ -81,16 +84,58 @@ export default function App() {
     }
   };
 
-  const handleGenerateReport = async () => {
-    setLoadingReport(true);
+  const openTxModal = async (tx: Transaction) => {
+    setSelectedTx(tx);
+    setTxDetail(null);
+    setExecResult(null);
+    setLoadingTx(true);
     try {
-      const res = await fetch(`${API_BASE}/api/report`);
+      const res = await fetch(`${API_BASE}/api/transaction/${tx.id}`);
       const data = await res.json();
-      setExecReport(data.report);
+      setTxDetail(data);
     } catch (err) {
-      console.error('Report Error:', err);
+      console.error('Tx Detail Error:', err);
     } finally {
-      setLoadingReport(false);
+      setLoadingTx(false);
+    }
+  };
+
+  const closeTxModal = () => {
+    setSelectedTx(null);
+    setTxDetail(null);
+    setExecResult(null);
+  };
+
+  const executeAction = async (cause: string) => {
+    if (!selectedTx) return;
+    setExecuting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/transaction/${selectedTx.id}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cause })
+      });
+      const data = await res.json();
+      setExecResult(data);
+      fetchData(); // Refresh underlying table
+    } catch (err) {
+      console.error('Execute Error:', err);
+    } finally {
+      setExecuting(false);
+    }
+  };
+
+  const handleApprove = async (txId: string, decision: string) => {
+    try {
+      await fetch(`${API_BASE}/api/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tx_id: txId, decision })
+      });
+      fetchData();
+      closeTxModal();
+    } catch (err) {
+      console.error('Approval Error:', err);
     }
   };
 
@@ -113,46 +158,57 @@ export default function App() {
     }
   };
 
-  const handleApprove = async (txId: string, decision: string) => {
-    try {
-      await fetch(`${API_BASE}/api/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tx_id: txId, decision })
-      });
-      fetchData();
-    } catch (err) {
-      console.error('Approval Error:', err);
-    }
-  };
-
-  const fetchAuditLog = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/audit-log`);
-      const data = await res.json();
-      setAuditLog(data.audit_log || []);
-    } catch (err) {
-      console.error('Audit Log Error:', err);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'audit') {
-      fetchAuditLog();
-    }
-  }, [activeTab]);
-
-  const renderBadge = (status: string) => {
+  const getRazorpayStatusBadge = (status: string, reason?: string) => {
     const st = String(status || '').trim();
-    if (st === 'Settled') return <span className="pill badge-settled">Settled</span>;
-    if (st === 'Recovered') return <span className="pill badge-recovered">Recovered</span>;
-    if (st === 'Flagged') return <span className="pill badge-flagged">Flagged</span>;
-    if (st === 'BROKEN_PROMISE') return <span className="pill badge-mismatched">Broken Promise</span>;
-    return <span className="pill badge-mismatched">Mismatched</span>;
-  };
-
-  const renderApiTag = (isLive?: number) => {
-    return isLive ? <span className="badge-live">Live API</span> : <span className="badge-sim">Simulated</span>;
+    if (st === 'Settled') {
+      return (
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+          <span className="text-green-400 font-mono text-xs uppercase tracking-wider">captured · settled</span>
+        </div>
+      );
+    }
+    if (st === 'Recovered') {
+      return (
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span className="text-emerald-400 font-mono text-xs uppercase tracking-wider">recovered</span>
+        </div>
+      );
+    }
+    if (st === 'Flagged') {
+      return (
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+          <span className="text-amber-400 font-mono text-xs uppercase tracking-wider">captured · flagged</span>
+        </div>
+      );
+    }
+    if (st === 'BROKEN_PROMISE') {
+      return (
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+          <span className="text-rose-400 font-mono text-xs uppercase tracking-wider">breach · escalated</span>
+        </div>
+      );
+    }
+    if (st === 'Mismatched') {
+      if (reason === 'PAYMENT_DECLINED_BANK') {
+        return (
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-red-500"></span>
+            <span className="text-red-400 font-mono text-xs uppercase tracking-wider">failed · mismatch detected</span>
+          </div>
+        );
+      }
+      return (
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-[#C9A227]"></span>
+          <span className="text-[#C9A227] font-mono text-xs uppercase tracking-wider">authorized · mismatch detected</span>
+        </div>
+      );
+    }
+    return <span className="font-mono text-xs uppercase text-zinc-400">{st}</span>;
   };
 
   const flaggedTxs = transactions.filter(t => t.flagged === 1);
@@ -167,421 +223,511 @@ export default function App() {
           </div>
           <div>
             <div className="text-lg font-bold text-[#FFFFFF] tracking-tight leading-none">AI Settlement Auditor</div>
-            <div className="text-xs text-[#71717A] mt-1 font-mono">Razorpay Builder Program</div>
+            <div className="text-xs text-[#71717A] mt-1 font-mono uppercase tracking-widest">Razorpay Open Track</div>
           </div>
         </div>
-
         <div className="flex items-center gap-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#121215] border border-[rgba(255,255,255,0.08)] text-xs text-[#A1A1AA]">
-            <span className="w-2 h-2 rounded-full bg-[#22C55E] animate-pulse"></span>
-            <span>Razorpay Sandbox Connected</span>
-          </div>
-
-          <label className="flex items-center gap-2 text-xs text-[#A1A1AA] cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={beginnerMode}
-              onChange={(e) => setBeginnerMode(e.target.checked)}
-              className="rounded border-[rgba(255,255,255,0.15)] accent-[#C9A227]"
-            />
-            <span>Explain Like I'm New Here</span>
-          </label>
-
-          <button className="btn-gold-primary" onClick={handleRunBatch} disabled={loadingBatch}>
-            {loadingBatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
-            <span>{loadingBatch ? 'Running...' : 'Run New Batch'}</span>
-          </button>
+          <a href={`${API_BASE}/api/export-csv`} download className="text-xs text-[#C9A227] hover:text-white transition-colors flex items-center gap-2">
+            <Download className="w-3 h-3" /> Export Audit Log
+          </a>
         </div>
       </div>
 
-      {/* --- RAPPID-STYLE HERO SECTION (Left-Aligned Headline + Stats Panel) --- */}
-      <div className="pt-16 pb-16 grid grid-cols-12 gap-12 items-center">
-        {/* Left Column: Bold Headline & CTA */}
+      {/* --- HERO SECTION --- */}
+      <div className="pt-16 pb-12 grid grid-cols-12 gap-12 items-center">
         <div className="col-span-7 space-y-6">
-          <h1 className="text-[52px] font-extrabold font-display text-[#FFFFFF] tracking-[-0.03em] leading-[1.08]">
-            The payment platform <br />
-            that recovers your money.
+          <h1 className="text-5xl font-extrabold text-[#FFFFFF] leading-[1.1] tracking-tight font-display">
+            Autonomous Settlement Auditing for Razorpay Merchants.
           </h1>
-          <p className="text-lg text-[#A1A1AA] font-normal leading-relaxed max-w-xl">
-            Autonomous multi-source reconciliation, plain-English failure analysis, and bounded AI recovery for Razorpay merchant settlements.
+          <p className="text-[#A1A1AA] text-lg leading-relaxed max-w-2xl font-light">
+            Detect mismatches. Explain failures in plain English. Recover amounts within bounds. Log everything.
           </p>
-
-          <div className="flex items-center gap-4 pt-2">
-            <button className="btn-gold-primary" onClick={handleRunBatch} disabled={loadingBatch}>
+          <div className="pt-4 p-4 rounded-xl border border-[rgba(255,255,255,0.05)] bg-[#121215] max-w-xl">
+            <p className="text-sm text-zinc-400 leading-relaxed mb-4">
+              When you run a new batch, the system pulls 10 transactions across multiple failure scenarios from the Razorpay test environment, checks each one against your expected ledger, and attempts bounded recovery actions where the failure type is known and safe to handle automatically. Anything unusual or above your configured thresholds is held for your review before any action is taken.
+            </p>
+            <button className="btn-gold-primary w-full justify-center" onClick={handleRunBatch} disabled={loadingBatch}>
               {loadingBatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
-              <span>{loadingBatch ? 'Executing Pipeline...' : 'Run New Batch'}</span>
+              <span>{loadingBatch ? 'Running Batch...' : 'Run New Batch'}</span>
             </button>
-            <button className="btn-dark-secondary" onClick={handleGenerateReport} disabled={loadingReport}>
-              <FileText className="w-4 h-4 text-[#C9A227]" />
-              <span>{loadingReport ? 'Generating Report...' : 'Executive Summary'}</span>
-            </button>
-          </div>
-
-          {/* Key Feature Bullets */}
-          <div className="grid grid-cols-2 gap-4 pt-6 text-xs text-[#A1A1AA]">
-            <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-[#C9A227]" />
-              <span>Multi-Source Ledger Audit</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-[#C9A227]" />
-              <span>Groq Llama 3.1 Plain English</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-[#C9A227]" />
-              <span>Fair Incentive Safety Gate</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-[#C9A227]" />
-              <span>100% Deterministic Recovery</span>
-            </div>
           </div>
         </div>
 
-        {/* Right Column: Hero Stats Card (Rappid Style) */}
-        <div className="col-span-5 space-y-4">
-          <div className="card-container p-8 space-y-6 border border-[rgba(255,255,255,0.12)]">
-            <div className="text-xs font-semibold text-[#C9A227] uppercase tracking-wider flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#C9A227]"></span>
-              <span>Total Recovered Revenue</span>
+        <div className="col-span-5 grid grid-cols-2 gap-4">
+          <div className="bg-[#121215] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white opacity-[0.02] rounded-bl-full group-hover:scale-110 transition-transform"></div>
+            <div className="text-[#71717A] text-xs font-mono mb-2">Transactions Audited</div>
+            <div className="text-3xl font-bold text-white font-display">{metrics.total_processed}</div>
+          </div>
+          <div className="bg-[#121215] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-[#C9A227] opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
+            <div className="text-[#C9A227] text-xs font-mono mb-2 uppercase tracking-wider">Amount Recovered</div>
+            <div className="text-3xl font-bold text-[#C9A227] font-display">
+              ₹{metrics.amount_recovered.toLocaleString('en-IN')}
             </div>
-            <div className="text-[44px] font-bold text-[#C9A227] font-mono tracking-tight leading-none">
-              ₹{(metrics.amount_recovered || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </div>
+          <div className="bg-[#121215] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl relative overflow-hidden group cursor-pointer hover:border-amber-500/50 transition-colors" onClick={() => setActiveTab('flagged')}>
+            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500 opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
+            <div className="text-amber-500 text-xs font-mono mb-2 flex items-center gap-2">
+              Pending Human Approval <ArrowRight className="w-3 h-3" />
             </div>
-            <p className="text-xs text-[#71717A]">
-              Spent 0 seconds manual auditing across active merchant settlement batches.
-            </p>
-            <div className="border-t border-[rgba(255,255,255,0.08)] pt-4 grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-xs text-[#71717A] uppercase font-mono">Processed</div>
-                <div className="text-xl font-bold text-[#FFFFFF] font-mono mt-1">{metrics.total_processed || 0}</div>
-              </div>
-              <div>
-                <div className="text-xs text-[#71717A] uppercase font-mono">Mismatches</div>
-                <div className="text-xl font-bold text-[#FFFFFF] font-mono mt-1">{metrics.mismatches_detected || 0}</div>
-              </div>
-              <div>
-                <div className="text-xs text-[#71717A] uppercase font-mono">Pending</div>
-                <div className="text-xl font-bold text-[#FFFFFF] font-mono mt-1">{metrics.pending_approval || 0}</div>
-              </div>
-            </div>
+            <div className="text-3xl font-bold text-amber-500 font-display">{metrics.pending_approval}</div>
+          </div>
+          <div className="bg-[#121215] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500 opacity-5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
+            <div className="text-rose-400 text-xs font-mono mb-2">Mismatches Detected</div>
+            <div className="text-3xl font-bold text-white font-display">{metrics.mismatches_detected}</div>
           </div>
         </div>
       </div>
 
-      {/* Executive Report Card */}
-      {execReport && (
-        <div className="card-container p-6 mb-10 border-l-4 border-l-[#C9A227]">
-          <h3 className="text-sm font-semibold text-[#C9A227] mb-2 flex items-center gap-2">
-            <FileText className="w-4 h-4" /> Executive Batch Summary Report (Groq Llama 3.1)
-          </h3>
-          <p className="text-sm text-[#FFFFFF] leading-relaxed font-normal">{execReport}</p>
+      {/* --- PIPELINE STRIP --- */}
+      {metrics.total_processed > 0 && (
+        <div className="mb-12 border-y border-[rgba(255,255,255,0.05)] py-6 bg-[#0a0a0c]">
+          <div className="flex items-center justify-between max-w-4xl mx-auto px-4">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]"></div>
+              <span className="text-xs font-mono text-zinc-500 uppercase">Razorpay API</span>
+            </div>
+            <div className="h-px bg-[rgba(255,255,255,0.1)] flex-1 mx-4"></div>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]"></div>
+              <span className="text-xs font-mono text-zinc-500 uppercase">Reconciliation</span>
+            </div>
+            <div className="h-px bg-[rgba(255,255,255,0.1)] flex-1 mx-4"></div>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]"></div>
+              <span className="text-xs font-mono text-zinc-500 uppercase">Anomaly Detected</span>
+            </div>
+            <div className="h-px bg-[rgba(255,255,255,0.1)] flex-1 mx-4"></div>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]"></div>
+              <span className="text-xs font-mono text-zinc-500 uppercase">Human Gate</span>
+            </div>
+            <div className="h-px bg-[rgba(255,255,255,0.1)] flex-1 mx-4"></div>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-zinc-400 shadow-[0_0_10px_rgba(161,161,170,0.3)]"></div>
+              <span className="text-xs font-mono text-zinc-500 uppercase">Audit Log</span>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Anomaly Trend Warning Banner */}
-      {metrics.trend_warning && (
-        <div className="trend-alert flex items-center gap-3 mb-10">
-          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-          <span>{metrics.trend_warning}</span>
+      {/* --- BATCH RESULT BANNER --- */}
+      {batchResult && (
+        <div className="mb-8 p-4 bg-emerald-950/30 border border-emerald-900/50 rounded-xl flex items-center justify-between">
+          <div className="flex items-center gap-3 text-emerald-400 text-sm">
+            <CheckCircle2 className="w-5 h-5" />
+            <span>
+              Batch complete | {batchResult.generated} processed | {batchResult.reconciliation.mismatches} mismatches detected | 
+              ₹{batchResult.reconciliation.recovered_amount} recovery actions dispatched.
+            </span>
+          </div>
+          <button className="text-emerald-400 hover:text-white" onClick={() => setBatchResult(null)}><X className="w-4 h-4" /></button>
         </div>
       )}
 
-      {/* --- DASHBOARD TAB WORKSPACE --- */}
-      <div className="flex gap-4 border-b border-[rgba(255,255,255,0.08)] mb-8">
-        <button 
-          className={`px-6 py-3 text-sm font-semibold transition-all duration-150 border-b-2 ${activeTab === 'overview' ? 'border-[#C9A227] text-[#C9A227] bg-[#C9A227]/5 rounded-t-lg' : 'border-transparent text-[#A1A1AA] hover:text-[#FFFFFF]'}`} 
+      {/* --- ALERT CARD --- */}
+      {metrics.pending_approval > 0 && activeTab !== 'flagged' && (
+        <div className="mb-8 p-4 bg-amber-950/20 border border-amber-900/50 rounded-xl flex items-center justify-between cursor-pointer hover:bg-amber-950/30 transition-colors" onClick={() => setActiveTab('flagged')}>
+          <div className="flex items-center gap-3 text-amber-500 text-sm font-medium">
+            <AlertTriangle className="w-5 h-5" />
+            {metrics.pending_approval} transaction(s) require your review before recovery can proceed
+          </div>
+          <div className="flex items-center gap-2 text-amber-500 text-xs uppercase tracking-wider font-bold">
+            Open Flagged Queue <ArrowRight className="w-3 h-3" />
+          </div>
+        </div>
+      )}
+
+      {/* --- TABS NAVIGATION --- */}
+      <div className="flex items-center gap-8 border-b border-[rgba(255,255,255,0.08)] mb-8 px-2">
+        <button
+          className={`pb-4 text-sm font-medium tracking-wide transition-all border-b-2 ${activeTab === 'overview' ? 'text-[#C9A227] border-[#C9A227]' : 'text-[#71717A] border-transparent hover:text-white'}`}
           onClick={() => setActiveTab('overview')}
         >
           Overview
         </button>
-        <button 
-          className={`px-6 py-3 text-sm font-semibold transition-all duration-150 border-b-2 ${activeTab === 'detail' ? 'border-[#C9A227] text-[#C9A227] bg-[#C9A227]/5 rounded-t-lg' : 'border-transparent text-[#A1A1AA] hover:text-[#FFFFFF]'}`} 
-          onClick={() => setActiveTab('detail')}
-        >
-          Transaction Detail
-        </button>
-        <button 
-          className={`px-6 py-3 text-sm font-semibold transition-all duration-150 border-b-2 ${activeTab === 'flagged' ? 'border-[#C9A227] text-[#C9A227] bg-[#C9A227]/5 rounded-t-lg' : 'border-transparent text-[#A1A1AA] hover:text-[#FFFFFF]'}`} 
+        <button
+          className={`pb-4 text-sm font-medium tracking-wide transition-all border-b-2 flex items-center gap-2 ${activeTab === 'flagged' ? 'text-[#C9A227] border-[#C9A227]' : 'text-[#71717A] border-transparent hover:text-white'}`}
           onClick={() => setActiveTab('flagged')}
         >
-          Flagged Queue {flaggedTxs.length > 0 && <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-[#F59E0B]/20 text-[#F59E0B] font-mono">{flaggedTxs.length}</span>}
+          Flagged Queue
+          {metrics.pending_approval > 0 && (
+            <span className="bg-amber-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full">{metrics.pending_approval}</span>
+          )}
         </button>
-        <button 
-          className={`px-6 py-3 text-sm font-semibold transition-all duration-150 border-b-2 ${activeTab === 'qa' ? 'border-[#C9A227] text-[#C9A227] bg-[#C9A227]/5 rounded-t-lg' : 'border-transparent text-[#A1A1AA] hover:text-[#FFFFFF]'}`} 
-          onClick={() => setActiveTab('qa')}
-        >
-          Ask the Auditor (Q&A)
-        </button>
-        <button 
-          className={`px-6 py-3 text-sm font-semibold transition-all duration-150 border-b-2 ${activeTab === 'audit' ? 'border-[#C9A227] text-[#C9A227] bg-[#C9A227]/5 rounded-t-lg' : 'border-transparent text-[#A1A1AA] hover:text-[#FFFFFF]'}`} 
+        <button
+          className={`pb-4 text-sm font-medium tracking-wide transition-all border-b-2 ${activeTab === 'audit' ? 'text-[#C9A227] border-[#C9A227]' : 'text-[#71717A] border-transparent hover:text-white'}`}
           onClick={() => setActiveTab('audit')}
         >
           Audit Log
         </button>
       </div>
 
-      {/* TAB 1: OVERVIEW */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          <div className="card-container overflow-hidden">
-            {loadingBatch ? (
-              <div className="p-8 space-y-4">
-                <div className="skeleton h-8 w-full"></div>
-                <div className="skeleton h-8 w-full"></div>
-                <div className="skeleton h-8 w-full"></div>
-              </div>
-            ) : transactions.length === 0 ? (
-              <div className="text-center text-[#71717A] py-16">
-                <Info className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm font-normal">No transactions detected. Click "Run New Batch" to trigger live API audit.</p>
-              </div>
-            ) : (
-              <table className="custom-table">
-                <thead>
-                  <tr>
-                    <th>Transaction ID</th>
-                    <th>Customer (Risk)</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                    <th>Type</th>
-                    <th>Action Taken</th>
-                    <th>Last Updated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map(t => (
-                    <tr key={t.id}>
-                      <td className="font-mono text-[#C9A227] font-medium">{t.id}</td>
-                      <td className="text-xs text-[#A1A1AA] font-mono">
-                        {t.customer_id || 'cust_101'} ({t.risk_tier || 'Low'} Risk)
-                      </td>
-                      <td className="font-mono font-medium text-[#FFFFFF]">₹{Number(t.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td>{renderBadge(t.status)}</td>
-                      <td>{renderApiTag(t.is_live_api_call)}</td>
-                      <td className="text-[#A1A1AA] text-sm font-normal">
-                        {t.action_taken}
-                        {t.tax_mismatch === 1 && <span className="text-[#EF4444] font-medium ml-2">[GST Discrepancy]</span>}
-                      </td>
-                      <td className="text-[#71717A] text-xs font-mono">{t.updated_at}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: TRANSACTION DETAIL */}
-      {activeTab === 'detail' && (
-        <div className="space-y-8">
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-[#A1A1AA] font-normal">Select Transaction ID:</label>
-            <select
-              value={selectedTxId}
-              onChange={(e) => setSelectedTxId(e.target.value)}
-              className="bg-[#121215] text-[#FFFFFF] border border-[rgba(255,255,255,0.15)] px-4 py-2.5 rounded-xl text-sm font-mono focus:outline-none focus:border-[#C9A227]"
-            >
-              {transactions.map(t => (
-                <option key={t.id} value={t.id}>{t.id} ({t.status})</option>
-              ))}
-            </select>
-          </div>
-
-          {txDetail && (
-            <div className="grid grid-cols-2 gap-8">
-              {/* Left Column: Fee Breakdown */}
-              <div className="card-container p-8 space-y-6">
-                <h3 className="text-[16px] font-semibold text-[#FFFFFF] pb-4 border-b border-[rgba(255,255,255,0.08)] flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-[#C9A227]" /> Fee Breakdown & Multi-Source Audit
-                </h3>
-                {txDetail.fee_breakdown ? (
-                  <div className="space-y-3 text-sm">
-                    <div className="fee-row">
-                      <span className="fee-label">Gross Amount</span>
-                      <span className="fee-value font-mono">₹{Number(txDetail.fee_breakdown.gross_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="fee-row">
-                      <span className="fee-label">Gateway Fee (2.0%)</span>
-                      <span className="fee-deduction font-mono">- ₹{Number(txDetail.fee_breakdown.gateway_fee).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="fee-row">
-                      <span className="fee-label">Bank Fee (0.5%)</span>
-                      <span className="fee-deduction font-mono">- ₹{Number(txDetail.fee_breakdown.bank_fee).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="fee-row">
-                      <span className="fee-label">GST (18.0%)</span>
-                      <span className="fee-deduction font-mono">- ₹{Number(txDetail.fee_breakdown.gst).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="fee-row pt-4">
-                      <span className="text-[#C9A227] font-semibold">Net Settled Amount</span>
-                      <span className="fee-net font-mono">₹{Number(txDetail.fee_breakdown.net_settled).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    {txDetail.transaction.tax_mismatch === 1 && (
-                      <div className="text-[#EF4444] text-xs font-normal pt-2 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                        <span>Tax-Line Matcher Warning: GST deviates from standard 18% gateway fee rate.</span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-[#A1A1AA] font-normal">Fee breakdown unavailable for un-settled or declined payments.</p>
-                )}
-              </div>
-
-              {/* Right Column: Rationale & Actions */}
-              <div className="space-y-8">
-                <div className="card-container p-8 space-y-5">
-                  <h3 className="text-[16px] font-semibold text-[#FFFFFF] pb-4 border-b border-[rgba(255,255,255,0.08)] flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[#22C55E]" /> Agent Analysis & Escalation Ladder
-                  </h3>
-                  <div>
-                    <div className="text-[12px] font-medium text-[#71717A] uppercase tracking-[0.04em] mb-1">Failure Cause</div>
-                    <div className="font-mono text-sm text-[#EF4444]">{txDetail.transaction.failure_reason || 'N/A (Standard Processing)'}</div>
-                  </div>
-                  <div>
-                    <div className="text-[12px] font-medium text-[#71717A] uppercase tracking-[0.04em] mb-1">LLM Cause Analysis</div>
-                    <div className="text-sm text-[#A1A1AA] font-normal leading-relaxed">{txDetail.explanation}</div>
-                  </div>
-                  <div>
-                    <div className="text-[12px] font-medium text-[#71717A] uppercase tracking-[0.04em] mb-1">Settlement Delay Predictor</div>
-                    <div className="text-sm text-[#C9A227] font-medium flex items-center gap-2 font-mono">
-                      <Clock className="w-4 h-4" /> {txDetail.delay_prediction}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[12px] font-medium text-[#71717A] uppercase tracking-[0.04em] mb-1">Confidence & Safety Score</div>
-                    <div className="text-sm text-[#22C55E] font-medium flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4" /> {txDetail.transaction.confidence_note || 'Rule-based safety check executed.'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[12px] font-medium text-[#71717A] uppercase tracking-[0.04em] mb-1">Action Executed</div>
-                    <div className="text-sm text-[#FFFFFF] font-normal flex items-center gap-2">
-                      <span>{txDetail.transaction.action_taken}</span>
-                      {renderApiTag(txDetail.transaction.is_live_api_call)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="card-container p-8">
-                  <h3 className="text-[16px] font-semibold text-[#FFFFFF] pb-4 border-b border-[rgba(255,255,255,0.08)] mb-3 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-[#C9A227]" /> Handoff Summary (For Support Ticket)
-                  </h3>
-                  <p className="text-sm text-[#A1A1AA] font-normal leading-relaxed">{txDetail.handoff_summary}</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 3: FLAGGED FOR APPROVAL */}
-      {activeTab === 'flagged' && (
-        <div className="space-y-6">
-          {flaggedTxs.length === 0 ? (
-            <div className="card-container text-center text-[#A1A1AA] py-16">
-              <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-[#22C55E] opacity-80" />
-              <p className="text-sm font-normal">No transactions currently flagged for human review. All recovery actions within safety bounds.</p>
-            </div>
-          ) : (
-            flaggedTxs.map(t => (
-              <div key={t.id} className="card-container p-8 space-y-4">
-                <div className="flex justify-between items-center">
-                  <div className="text-sm text-[#FFFFFF] font-normal">
-                    Transaction: <span className="font-mono text-[#C9A227]">{t.id}</span> | Customer: <strong>{t.customer_id || 'cust_101'}</strong> ({t.risk_tier || 'Low'} Risk)
-                  </div>
-                  <div className="text-lg font-bold font-mono text-[#FFFFFF]">₹{Number(t.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-                </div>
-                <div className="bg-[rgba(245,158,11,0.08)] border-l-4 border-[#F59E0B] p-4 rounded-r-lg text-xs font-normal text-[#F59E0B]">
-                  <strong>Fair Incentive Gate Reason:</strong> {t.flag_reason}
-                </div>
-                <div className="flex gap-4 pt-2">
-                  <button className="btn-gold-primary text-xs" onClick={() => handleApprove(t.id, 'APPROVE')}>
-                    <CheckCircle2 className="w-4 h-4" /> Approve Incentive
-                  </button>
-                  <button className="btn-dark-secondary text-xs" onClick={() => handleApprove(t.id, 'REJECT')}>
-                    <XCircle className="w-4 h-4 text-[#EF4444]" /> Reject Incentive
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* TAB 4: ASK THE AUDITOR (Q&A) */}
-      {activeTab === 'qa' && (
-        <div className="space-y-8">
-          <div className="card-container p-8">
-            <h3 className="text-[16px] font-semibold text-[#FFFFFF] mb-2 flex items-center gap-2">
-              <Search className="w-4 h-4 text-[#C9A227]" /> Ask the Auditor (Groq Natural Language Q&A)
-            </h3>
-            <p className="text-xs text-[#A1A1AA] mb-6 font-normal">Ask any question about active batch statistics, specific transaction IDs, risk tiers, or mismatch recoveries.</p>
-            <form onSubmit={handleQASubmit} className="flex gap-4">
-              <input
-                type="text"
-                placeholder="e.g. 'What happened to transaction tx_live_...?' or 'Summarize high risk customers'"
-                value={qaQuery}
-                onChange={(e) => setQaQuery(e.target.value)}
-                className="flex-1 bg-[#000000] text-[#FFFFFF] border border-[rgba(255,255,255,0.15)] px-5 py-3 rounded-xl text-sm font-normal focus:outline-none focus:border-[#C9A227]"
-              />
-              <button type="submit" className="btn-gold-primary" disabled={loadingQA}>
-                {loadingQA ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                <span>Submit Question</span>
-              </button>
-            </form>
-          </div>
-
-          {qaAnswer && (
-            <div className="card-container p-8 border-l-4 border-l-[#C9A227] space-y-2">
-              <div className="text-xs font-medium text-[#C9A227] uppercase tracking-[0.04em]">Auditor Response (Groq Llama 3.1):</div>
-              <p className="text-sm text-[#FFFFFF] font-normal leading-relaxed">{qaAnswer}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 5: AUDIT LOG */}
-      {activeTab === 'audit' && (
-        <div className="space-y-6">
-          <div className="flex justify-start">
-            <a href={`${API_BASE}/api/export-csv`} download="audit_log.csv" className="btn-dark-secondary text-xs flex items-center gap-2">
-              <Download className="w-4 h-4 text-[#C9A227]" /> Export Audit Trail (CSV)
-            </a>
-          </div>
-
-          <div className="card-container overflow-hidden">
-            <table className="custom-table">
+      {/* --- TAB CONTENT --- */}
+      <div className="min-h-[500px]">
+        {activeTab === 'overview' && (
+          <div className="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#121215]">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Transaction ID</th>
-                  <th>Action Executed</th>
-                  <th>Type</th>
-                  <th>Details</th>
+                <tr className="border-b border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)]">
+                  <th className="py-4 px-6 text-xs font-mono text-[#71717A] uppercase tracking-wider">Transaction ID</th>
+                  <th className="py-4 px-6 text-xs font-mono text-[#71717A] uppercase tracking-wider">Customer</th>
+                  <th className="py-4 px-6 text-xs font-mono text-[#71717A] uppercase tracking-wider">Amount</th>
+                  <th className="py-4 px-6 text-xs font-mono text-[#71717A] uppercase tracking-wider">Status</th>
+                  <th className="py-4 px-6 text-xs font-mono text-[#71717A] uppercase tracking-wider">Failure Reason</th>
                 </tr>
               </thead>
-              <tbody>
-                {auditLog.map((a, idx) => (
-                  <tr key={a.id || idx}>
-                    <td className="text-xs text-[#71717A] font-mono">{a.timestamp}</td>
-                    <td className="font-mono text-[#C9A227] font-medium">{a.transaction_id}</td>
-                    <td className="text-xs font-medium text-[#FFFFFF]">{a.action}</td>
-                    <td>{renderApiTag(a.is_live_api_call)}</td>
-                    <td className="text-xs text-[#A1A1AA] font-normal">{a.details}</td>
+              <tbody className="divide-y divide-[rgba(255,255,255,0.03)]">
+                {transactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-[#71717A] text-sm">
+                      No transactions found. Run a batch to generate test data.
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  transactions.map(tx => (
+                    <tr key={tx.id} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors cursor-pointer group" onClick={() => openTxModal(tx)}>
+                      <td className="py-4 px-6 text-sm font-mono text-[#D4D4D8]">{tx.id}</td>
+                      <td className="py-4 px-6 text-sm text-[#A1A1AA]">{tx.customer_id}</td>
+                      <td className="py-4 px-6 text-sm text-white font-medium">₹{tx.amount.toLocaleString('en-IN')}</td>
+                      <td className="py-4 px-6">
+                        {getRazorpayStatusBadge(tx.status, tx.failure_reason)}
+                      </td>
+                      <td className="py-4 px-6 text-sm text-[#A1A1AA] group-hover:text-white transition-colors">
+                        {tx.failure_reason || '--'}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
+        )}
+
+        {activeTab === 'flagged' && (
+          <div className="space-y-6">
+            {flaggedTxs.length === 0 ? (
+              <div className="text-center py-20 text-zinc-500 border border-zinc-800/50 rounded-xl bg-zinc-900/20">
+                No transactions currently await human review.
+              </div>
+            ) : (
+              flaggedTxs.map(tx => (
+                <div key={tx.id} className="p-6 rounded-xl border border-amber-900/30 bg-[#121215] shadow-lg">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <div className="text-xl font-bold text-white font-display mb-1">₹{tx.amount}</div>
+                      <div className="text-sm font-mono text-zinc-500">{tx.id} · {tx.customer_id}</div>
+                    </div>
+                    {getRazorpayStatusBadge(tx.status, tx.failure_reason)}
+                  </div>
+                  <div className="p-4 bg-amber-950/20 border border-amber-900/50 rounded-lg mb-6">
+                    <div className="text-amber-500 text-sm font-medium mb-1">Consistency Check Flag</div>
+                    <div className="text-amber-400/80 text-sm">{tx.flag_reason}</div>
+                  </div>
+                  <div className="flex gap-4">
+                    <button className="flex-1 py-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium text-sm" onClick={() => handleApprove(tx.id, 'APPROVE')}>
+                      Approve Action
+                    </button>
+                    <button className="flex-1 py-2 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20 transition-colors font-medium text-sm" onClick={() => handleApprove(tx.id, 'REJECT')}>
+                      Reject & Escalate
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === 'audit' && (
+          <div className="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#121215]">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)]">
+                  <th className="py-4 px-6 text-xs font-mono text-[#71717A] uppercase tracking-wider">Timestamp</th>
+                  <th className="py-4 px-6 text-xs font-mono text-[#71717A] uppercase tracking-wider">Transaction</th>
+                  <th className="py-4 px-6 text-xs font-mono text-[#71717A] uppercase tracking-wider">Action Category</th>
+                  <th className="py-4 px-6 text-xs font-mono text-[#71717A] uppercase tracking-wider">Details</th>
+                  <th className="py-4 px-6 text-xs font-mono text-[#71717A] uppercase tracking-wider">Mode</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[rgba(255,255,255,0.03)]">
+                {auditLog.map((log, i) => {
+                  let badgeClass = "bg-zinc-800 text-zinc-300";
+                  if (log.action.includes('GENERATED')) badgeClass = "bg-blue-900/50 text-blue-400";
+                  if (log.action.includes('RECOVERY') || log.action.includes('EXECUTE')) badgeClass = "bg-[#C9A227]/20 text-[#C9A227]";
+                  if (log.action.includes('HUMAN_APP')) badgeClass = "bg-emerald-900/50 text-emerald-400";
+                  if (log.action.includes('HUMAN_REJ')) badgeClass = "bg-rose-900/50 text-rose-400";
+                  
+                  return (
+                    <tr key={i} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">
+                      <td className="py-4 px-6 text-xs font-mono text-[#A1A1AA] whitespace-nowrap">{log.timestamp}</td>
+                      <td className="py-4 px-6 text-xs font-mono text-[#D4D4D8]">{log.transaction_id}</td>
+                      <td className="py-4 px-6">
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${badgeClass}`}>
+                          {log.action}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-sm text-[#A1A1AA] max-w-md truncate">{log.details}</td>
+                      <td className="py-4 px-6">
+                        {log.is_live_api_call === 1 ? (
+                          <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded">Live API</span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-800 px-2 py-1 rounded">Simulated</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* --- TRANSACTION MODAL --- */}
+      {selectedTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#121215] border border-zinc-800 w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl flex flex-col">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center p-6 border-b border-zinc-800 bg-[#0a0a0c] sticky top-0 z-10">
+              <div>
+                <div className="flex items-center gap-4 mb-2">
+                  <h2 className="text-2xl font-display font-bold text-white">{selectedTx.id}</h2>
+                  <div className="text-xl text-[#C9A227] font-bold">₹{selectedTx.amount}</div>
+                </div>
+                {getRazorpayStatusBadge(selectedTx.status, selectedTx.failure_reason)}
+              </div>
+              <button onClick={closeTxModal} className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 flex-1 space-y-6">
+              
+              {/* Detection Sentence */}
+              <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
+                <div className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-2">Failure Detected</div>
+                <div className="text-zinc-300 text-sm leading-relaxed">
+                  {loadingTx ? 'Analyzing with Groq LLM...' : (txDetail?.explanation || 'No explanation available.')}
+                </div>
+              </div>
+              
+              {/* Handoff Summary - The "unburied" context loss feature */}
+              {txDetail?.handoff_summary && (
+                <div className="bg-indigo-950/20 p-4 rounded-xl border border-indigo-900/30">
+                  <div className="text-xs font-mono text-indigo-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <Activity className="w-3 h-3" /> Support Handoff Summary
+                  </div>
+                  <div className="text-indigo-200/80 text-sm font-medium italic">
+                    "{txDetail.handoff_summary}"
+                  </div>
+                </div>
+              )}
+
+              {/* Action Result / Execution panel */}
+              {execResult && (
+                <div className="bg-emerald-950/20 p-5 rounded-xl border border-emerald-900/50 space-y-4">
+                  <div className="text-emerald-400 font-bold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" /> Action Executed Successfully
+                  </div>
+                  <div className="text-zinc-300 text-sm">{execResult.action}</div>
+                  
+                  {execResult.merchant_message && (
+                    <div className="space-y-1">
+                      <div className="text-xs font-mono text-zinc-500 uppercase">Merchant Notification</div>
+                      <div className="p-3 bg-black/40 rounded border border-zinc-800 text-zinc-300 text-sm font-mono">{execResult.merchant_message}</div>
+                    </div>
+                  )}
+                  {execResult.customer_message && (
+                    <div className="space-y-1">
+                      <div className="text-xs font-mono text-zinc-500 uppercase">Customer Receipt / Link</div>
+                      <div className="p-3 bg-black/40 rounded border border-zinc-800 text-zinc-300 text-sm font-mono">{execResult.customer_message}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Possible Causes & Agent Actions */}
+              {!execResult && selectedTx.failure_reason && selectedTx.failure_reason !== 'nan' && selectedTx.status === 'Mismatched' && (
+                <div className="space-y-4">
+                  <div className="text-sm font-bold text-white border-b border-zinc-800 pb-2">Root Cause Resolution Paths</div>
+                  
+                  {selectedTx.failure_reason === 'PAYMENT_DECLINED_BANK' && (
+                    <>
+                      <div className="flex items-center justify-between p-4 bg-zinc-900/30 rounded-lg border border-zinc-800">
+                        <div>
+                          <div className="text-white text-sm font-medium mb-1">Insufficient funds</div>
+                          <div className="text-zinc-500 text-xs">Generates a split payment link via Razorpay Links API.</div>
+                        </div>
+                        <button onClick={() => executeAction('insufficient_funds')} disabled={executing} className="btn-dark-secondary text-xs">Execute Agent</button>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-zinc-900/30 rounded-lg border border-zinc-800">
+                        <div>
+                          <div className="text-white text-sm font-medium mb-1">Card blocked or expired</div>
+                          <div className="text-zinc-500 text-xs">Generates a fresh payment link for alternative methods.</div>
+                        </div>
+                        <button onClick={() => executeAction('card_blocked')} disabled={executing} className="btn-dark-secondary text-xs">Execute Agent</button>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-rose-950/20 rounded-lg border border-rose-900/30">
+                        <div>
+                          <div className="text-rose-400 text-sm font-medium mb-1">Fraud flag from bank</div>
+                          <div className="text-rose-400/70 text-xs">Blocks retries and escalates to human review.</div>
+                        </div>
+                        <button onClick={() => executeAction('fraud_flag')} disabled={executing} className="px-4 py-2 bg-rose-500/20 text-rose-400 rounded-lg text-xs font-medium hover:bg-rose-500/30">Escalate</button>
+                      </div>
+                    </>
+                  )}
+
+                  {selectedTx.failure_reason === 'REFUND_STUCK_GATEWAY' && (
+                    <div className="flex items-center justify-between p-4 bg-zinc-900/30 rounded-lg border border-zinc-800">
+                      <div>
+                        <div className="text-white text-sm font-medium mb-1">Gateway timeout during refund processing</div>
+                        <div className="text-zinc-500 text-xs">Calls Razorpay Refunds API to re-trigger.</div>
+                      </div>
+                      <button onClick={() => executeAction('stuck_refund_gateway')} disabled={executing} className="btn-dark-secondary text-xs">Execute Agent</button>
+                    </div>
+                  )}
+
+                  {selectedTx.failure_reason === 'SETTLEMENT_DELAYED_KYC' && (
+                    <div className="flex items-center justify-between p-4 bg-zinc-900/30 rounded-lg border border-zinc-800">
+                      <div>
+                        <div className="text-white text-sm font-medium mb-1">Missing KYC document on merchant account</div>
+                        <div className="text-zinc-500 text-xs">Identifies missing document and triggers webhook sync.</div>
+                      </div>
+                      <button onClick={() => executeAction('kyc_missing')} disabled={executing} className="btn-dark-secondary text-xs">Execute Agent</button>
+                    </div>
+                  )}
+                  
+                  {selectedTx.failure_reason === 'PAYMENT_CAPTURED_NOT_SETTLED' && (
+                    <div className="flex items-center justify-between p-4 bg-zinc-900/30 rounded-lg border border-zinc-800">
+                      <div>
+                        <div className="text-white text-sm font-medium mb-1">Batch processing delay at Razorpay</div>
+                        <div className="text-zinc-500 text-xs">Polls Settlements API to confirm status.</div>
+                      </div>
+                      <button onClick={() => executeAction('kyc_missing')} disabled={executing} className="btn-dark-secondary text-xs">Execute Agent</button>
+                    </div>
+                  )}
+
+                  {selectedTx.failure_reason === 'TAX_CALCULATION_DISCREPANCY' && txDetail?.fee_breakdown && (
+                    <div className="p-4 bg-zinc-900/30 rounded-lg border border-zinc-800 space-y-3">
+                      <div className="text-white text-sm font-medium">Wrong GST rate applied</div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-3 bg-rose-950/20 border border-rose-900/30 rounded">
+                          <div className="text-xs text-rose-400 mb-1 uppercase font-mono">Reported GST</div>
+                          <div className="text-lg text-rose-300 font-mono">₹{txDetail.fee_breakdown.gst}</div>
+                        </div>
+                        <div className="p-3 bg-emerald-950/20 border border-emerald-900/30 rounded">
+                          <div className="text-xs text-emerald-400 mb-1 uppercase font-mono">Corrected @ 18%</div>
+                          <div className="text-lg text-emerald-300 font-mono">₹{((txDetail.fee_breakdown.gateway_fee + txDetail.fee_breakdown.bank_fee) * 0.18).toFixed(2)}</div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-zinc-500">Agent Action: Awaiting merchant confirmation to issue corrected invoice.</div>
+                    </div>
+                  )}
+
+                  {selectedTx.failure_reason === 'DUPLICATE_CHARGE_SUSPECTED' && (
+                    <div className="p-4 bg-zinc-900/30 rounded-lg border border-zinc-800 space-y-3">
+                      <div className="text-white text-sm font-medium">Customer retried after timeout believing payment failed</div>
+                      <div className="flex items-center gap-4 text-xs font-mono text-zinc-400">
+                        <div className="flex-1 p-2 bg-black/50 rounded border border-zinc-800">tx_prev_12345 (Captured)</div>
+                        <div>← AND →</div>
+                        <div className="flex-1 p-2 bg-amber-950/30 text-amber-500 rounded border border-amber-900/50">{selectedTx.id} (Captured)</div>
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-2">Agent Action: Both payments successfully captured. Refund for {selectedTx.id} paused pending merchant verification.</div>
+                    </div>
+                  )}
+
+                </div>
+              )}
+
+              {/* Normal Settled Details */}
+              {selectedTx.status === 'Settled' && txDetail?.fee_breakdown && (
+                <div className="grid grid-cols-5 gap-2 border border-zinc-800 rounded-lg overflow-hidden">
+                  <div className="bg-zinc-900/50 p-3 text-center border-r border-zinc-800">
+                    <div className="text-[10px] text-zinc-500 font-mono uppercase mb-1">Gross</div>
+                    <div className="text-sm text-white font-mono">₹{txDetail.fee_breakdown.gross_amount}</div>
+                  </div>
+                  <div className="bg-zinc-900/50 p-3 text-center border-r border-zinc-800">
+                    <div className="text-[10px] text-zinc-500 font-mono uppercase mb-1">GW Fee (2%)</div>
+                    <div className="text-sm text-rose-400 font-mono">-₹{txDetail.fee_breakdown.gateway_fee}</div>
+                  </div>
+                  <div className="bg-zinc-900/50 p-3 text-center border-r border-zinc-800">
+                    <div className="text-[10px] text-zinc-500 font-mono uppercase mb-1">Bank Fee</div>
+                    <div className="text-sm text-rose-400 font-mono">-₹{txDetail.fee_breakdown.bank_fee}</div>
+                  </div>
+                  <div className="bg-zinc-900/50 p-3 text-center border-r border-zinc-800">
+                    <div className="text-[10px] text-zinc-500 font-mono uppercase mb-1">GST (18%)</div>
+                    <div className="text-sm text-rose-400 font-mono">-₹{txDetail.fee_breakdown.gst}</div>
+                  </div>
+                  <div className="bg-[#121215] p-3 text-center">
+                    <div className="text-[10px] text-emerald-500 font-mono uppercase mb-1">Net Settled</div>
+                    <div className="text-sm text-emerald-400 font-mono font-bold">₹{txDetail.fee_breakdown.net_settled}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Flagged actions if directly in flagged state */}
+              {selectedTx.flagged === 1 && (
+                <div className="mt-6 border-t border-zinc-800 pt-6 flex gap-4">
+                  <button className="flex-1 py-3 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium" onClick={() => handleApprove(selectedTx.id, 'APPROVE')}>
+                    Approve Action
+                  </button>
+                  <button className="flex-1 py-3 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20 transition-colors font-medium" onClick={() => handleApprove(selectedTx.id, 'REJECT')}>
+                    Reject & Escalate
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Footer */}
-      <div className="app-footer">
-        Running on Razorpay test-mode data. No real transactions are processed.
+      {/* --- QA FLOATING BUBBLE --- */}
+      <div className="fixed bottom-8 right-8 z-40">
+        {qaOpen ? (
+          <div className="bg-[#121215] border border-zinc-800 rounded-2xl shadow-2xl w-[400px] flex flex-col overflow-hidden animate-in slide-in-from-bottom-5">
+            <div className="bg-zinc-900 p-4 border-b border-zinc-800 flex justify-between items-center">
+              <div className="flex items-center gap-2 text-white font-medium">
+                <MessageCircle className="w-4 h-4 text-[#C9A227]" /> Ask the Auditor
+              </div>
+              <button onClick={() => setQaOpen(false)} className="text-zinc-500 hover:text-white"><X className="w-4 h-4"/></button>
+            </div>
+            <div className="p-4 h-64 overflow-y-auto">
+              {qaAnswer ? (
+                <div className="text-sm text-zinc-300 leading-relaxed bg-zinc-900/50 p-3 rounded-lg border border-zinc-800">
+                  {qaAnswer}
+                </div>
+              ) : (
+                <div className="text-sm text-zinc-500 text-center mt-20">
+                  Ask Groq any question about the current ledger state, flagged transactions, or recovery metrics.
+                </div>
+              )}
+            </div>
+            <form onSubmit={handleQASubmit} className="p-3 border-t border-zinc-800 bg-zinc-950 flex gap-2">
+              <input 
+                type="text" 
+                value={qaQuery}
+                onChange={e => setQaQuery(e.target.value)}
+                placeholder="E.g., Why are there so many mismatches?"
+                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C9A227]"
+              />
+              <button type="submit" disabled={loadingQA} className="btn-gold-primary px-4 py-2">
+                {loadingQA ? '...' : 'Ask'}
+              </button>
+            </form>
+          </div>
+        ) : (
+          <button 
+            onClick={() => setQaOpen(true)}
+            className="w-14 h-14 rounded-full bg-[#C9A227] hover:bg-[#D4AF37] flex items-center justify-center text-black shadow-lg shadow-[#C9A227]/20 transition-transform hover:scale-105"
+          >
+            <MessageCircle className="w-6 h-6" />
+          </button>
+        )}
       </div>
     </div>
   );
